@@ -461,10 +461,10 @@ rcp.simple.relab = function(exp.ppp, num.relabs, thickness, rcp.list, maxGr,
   clusterExport(cl, "RCP.simple", envir = environment())
   # calculate T values for K and G summaries for a variety of max radii
   RCP.simple.T.G = parLapply(cl, G.rad.vec, function(x) {
-    T.calc.G(RCP.simple, x)
+    Tcalc(RCP.simple, x)
   })
   RCP.simple.T.K = parLapply(cl, K.rad.vec, function(x) {
-    T.calc.K(RCP.simple, x)
+    Tcalc(RCP.simple, x)
   })
   # get the 95% CI envelope
   RCP.simple = relabeler.2d(RCP.simple, envelope.value = 0.95) # use same name to get rid of the older (and enormous) object
