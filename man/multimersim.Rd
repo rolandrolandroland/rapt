@@ -5,14 +5,15 @@
 \title{Simulate 2D Multimers}
 \usage{
 multimersim(
-  exp.ppp,
+  exp_ppp,
   thickness,
   group_size = 2,
   num_neighbors = 6,
+  neighbor_number = 1,
   weights = c(1, 1, 1/4),
   probs = c(0.6, 0.2, 0.2, 0),
-  rcp.pattern,
-  intensity.rcp = 1,
+  rcp_pattern,
+  intensity_rcp = 1,
   maxGr,
   maxKr,
   nGr,

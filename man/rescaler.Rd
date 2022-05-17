@@ -4,18 +4,17 @@
 \alias{rescaler}
 \title{Rescaler Function}
 \usage{
-rescaler(pattern, new.intensity)
+rescaler(pattern, new_intensity)
 }
 \arguments{
 \item{pattern}{3D point pattern (pp3 object) to be scaled}
 
-\item{new.intensity}{final intensity of point pattern}
+\item{new_intensity}{final intensity of point pattern}
 }
 \value{
-pp3.new will preserve all properties of the input \emph{pattern}, except the intensity
+pp3_new will preserve all properties of the input \emph{pattern}, except the intensity
 }
 \description{
-#' @description
 Rescales an input 3D point pattern
 }
 \details{
