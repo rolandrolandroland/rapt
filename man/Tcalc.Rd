@@ -4,7 +4,7 @@
 \alias{Tcalc}
 \title{Calculate T value}
 \usage{
-Tcalc(relabelings, func = "K", rmin = 0, rmax)
+Tcalc(relabelings, func = "K", rmin = 0, rmax, K_cor = "border", G_cor = "km")
 }
 \description{
 Takes input of relabeling object and calculates the T value for either K or G function
@@ -14,5 +14,6 @@ This uses the method from \emph{Baddeley et al.} to calculate the T value for an
 K  (\emph{K3est}) G \emph{G3est} function
 }
 \references{
-Baddeley, A., Diggle, P. J., Hardegen, A., Lawrence, T_, Milne, R. K., & Nair, G. (2014). On tests of spatial pattern based on simulation envelopes. Ecological Monographs, 84(3), 477–489. https://doi.org/10.1890/13-2042.1
+Baddeley, A., Diggle, P. J., Hardegen, A., Lawrence, T_, Milne, R. K., & Nair, G. (2014).
+On tests of spatial pattern based on simulation envelopes. Ecological Monographs, 84(3), 477–489. https://doi.org/10.1890/13-2042.1
 }

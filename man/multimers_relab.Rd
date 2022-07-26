@@ -22,5 +22,5 @@ multimers_relab(
 )
 }
 \description{
-Relabel multimers
+multimer
 }
