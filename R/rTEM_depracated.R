@@ -1,0 +1,330 @@
+## these file are depracated:: I am keeping copies of them, but they are not to be used any more
+#'
+#'
+#'
+#'
+
+#' Simulate 2D Multimers
+#'
+#' @description Simulate
+multimersim_v01 = function(exp_ppp,  thickness, group_size = 2,
+                       num_neighbors = 6, neighbor_number = 1, weights = c(1, 1, 1/4), probs = c(0.6, 0.2, 0.2, 0),
+                       rcp_pattern, intensity_rcp = 1, maxGr, maxKr, nGr, nKr) {
+  ## make probability vector same length as num_neighbors
+  if (num_neighbors > length(probs)) {
+    probs = c(probs, rep(0, num_neighbors - length(probs)))
+  }
+
+  # get desired intensity
+  npoints = exp_ppp$n
+  print(npoints)
+  box_2d = exp_ppp$window
+
+  box_area = area(box_2d)
+  #vol = box_area * thickness
+  # intensity_exp = npoints / vol
+  # rescale RCP pattern to match physical system (1 point per nm)
+  rcp_scaled = rescaler(rcp_pattern, intensity_rcp)
+
+  # subset so that it is now only includes the points in the xy range of the TEM points and z range of thickness
+  rcp_box = subset(rcp_scaled, x > box_2d$xrange[1] & x < box_2d$xrange[2] &
+                     y > box_2d$yrange[1] & y < box_2d$yrange[2] &
+                     z >0 & z < thickness)
+  ## label n/2 points as dopant and the rest as host
+  n_irp = npoints
+  n_total = length(rcp_box$data$x)
+  n_host = n_total - n_irp
+
+  # determine the number of groups of molecules to be present (if multimers, then n_irp/2)
+  n_groups = round(n_irp/ group_size,0)
+  rcp_labeled = rlabel(rcp_box, labels = c(rep("A",n_groups) , rep("C", length(rcp_box$data$x) - n_groups)), permute = TRUE)
+  # extract dopant points
+  rcp_dope = subset(rcp_labeled, marks == "A")
+  # extract host points
+  rcp_host = subset(rcp_labeled, marks == "C")
+  # find 6 nearest host to each dopant
+  nn_ind= lapply(1:num_neighbors, function(x) {
+    nncross(rcp_dope, rcp_host, k = x)
+  })
+
+  # get nn distance x, y, and z values for each neighbor
+  dist_coords = lapply(1:num_neighbors, function(x) {
+    coords(rcp_dope) - coords(rcp_host[nn_ind[[x]][,2]])
+  })
+  # this just rearranges dist_coords to be grouped by point rather than neighbor order
+  holder = c()
+  neighbors = lapply(1:nrow(dist_coords[[1]]), function(x) {
+    for (i in 1:length(dist_coords)) {
+      holder = rbind(holder, dist_coords[[i]][x,])
+    }
+    return(holder)
+  })
+
+  # rank each of the nearest neighbors based upon distance and weights (distance will be mostly x-y distance)
+  # rank will be from smallest to largest
+  ranks = lapply(1:length(neighbors), function(outer) {
+    distances = sapply(1:nrow(neighbors[[outer]]), function(inner) {
+      sqrt(weights[1]*neighbors[[outer]]$x[inner]^2 + weights[2]*neighbors[[outer]]$y[inner]^2 +weights[3]*neighbors[[outer]]$z[inner]^2)
+    })
+    order(distances)
+    rank(distances)
+  })
+
+  # semi randomly select one of the neighbors, prefering onces with lower x-y distance
+  which_neighbor = t(sapply(1:length(ranks), function(i) {
+    sample(1:num_neighbors, size =group_size-1, prob = probs[ranks[[i]]])
+  }))
+  if (group_size == 2) {
+    which_neighbor = which_neighbor[1,]
+  }
+
+  which_neighbor = cbind(1:(length(which_neighbor)/(group_size-1)), which_neighbor)
+
+  # get the coordinates of the semi randomly selected neighbor
+  ind= t(sapply(1:nrow(which_neighbor), function(i) {
+    sapply(2:(group_size), function(j) {
+      nn_ind[[which_neighbor[i,j]]][i,2]
+    })
+  }))
+
+  #duplicate = apply(ind, 2, duplicated)
+  #duplicate = duplicated(c(ind))
+  duplicate = duplicated(ind, MARGIN = 0)
+  duplicate_ind = which(duplicate, arr.ind = TRUE)[,1]
+  duplicate_ind = unique(duplicate_ind)
+  not_duplicate = ind[!duplicate]
+  ## points that are not duplicates
+  chosen_points = rcp_host$data[not_duplicate]
+
+
+  ## host pattern with previously used points removed
+  host_unique_pp3 = rcp_host[-ind]
+  #unique_points = rcp_host$data[-ind[duplicate],]
+  print(paste("first duplicate ", sum(duplicate)))
+
+
+  ### for each duplicate nearest neighbor (whenever the same host is the nearest neighbor for two dopants )
+  # take the 2nd nearest neighbor
+  while (sum(duplicate >0) ) {
+
+    # find 6 nearest host to each dopant
+    next_nn= lapply(1:num_neighbors, function(x) {
+      nncross(rcp_dope, host_unique_pp3, k = x)
+    })
+
+    ####
+    dist_coords = lapply(1:num_neighbors, function(x) {
+      coords(rcp_dope) - coords(host_unique_pp3[next_nn[[x]][,2]])
+    })
+    ####
+
+    # this just rearranges dist_coords to be grouped by point rather than neighbor order
+    holder = c()
+    neighbors = lapply(1:nrow(dist_coords[[1]]), function(x) {
+      for (i in 1:length(dist_coords)) {
+        holder = rbind(holder, dist_coords[[i]][x,])
+      }
+      return(holder)
+    })
+
+    # rank each of the nearest neighbors based upon distance and weights (distance will be mostly x-y distance)
+    # rank will be from smallest to largest
+    ranks = lapply(1:length(neighbors), function(outer) {
+      distances = sapply(1:nrow(neighbors[[outer]]), function(inner) {
+        sqrt(weights[1]*neighbors[[outer]]$x[inner]^2 + weights[2]*neighbors[[outer]]$y[inner]^2 +weights[3]*neighbors[[outer]]$z[inner]^2)
+      })
+      order(distances)
+      rank(distances)
+    })
+
+
+    # semi randomly select one of the neighbors, prefering onces with lower x-y distance
+    which_neighbor = t(sapply(1:length(ranks), function(i) {
+      sample(1:num_neighbors, size =group_size-1, prob = probs[ranks[[i]]])
+    }))
+    if (group_size == 2) {
+      which_neighbor = which_neighbor[1,]
+    }
+    which_neighbor = cbind(1:(length(which_neighbor)/(group_size-1)), which_neighbor)
+
+
+    # get the coordinates of the semi randomly selected neighbor
+    all_ind= t(sapply(1:nrow(which_neighbor), function(i) {
+      sapply(2:(group_size), function(j) {
+        next_nn[[which_neighbor[i,j]]][i,2]
+      })
+    }))
+
+    #ind[duplicate] = all_ind[duplicate]
+    #all_ind = c(all_ind)
+    # duplicate = c(duplicate)
+    # extract just the ones needed to replace duplicates
+    next_ind =all_ind[duplicate]
+
+    ## use two duplicates - one that has the index of duplicates in entire all_ind, one that has actual new duplicates
+    #new = all_ind[duplicate]
+    mat_1 = matrix(FALSE, nrow = nrow(all_ind), ncol = ncol(all_ind))
+    mat_1[duplicate] = all_ind[duplicate]
+    # zeros = test ==0
+    duplicate_mat = duplicated(mat_1, MARGIN = 0)
+    duplicate_mat[mat_1==0] = FALSE
+
+
+    ## get duplicates and their index
+    duplicate = duplicated(next_ind, MARGIN = 0)
+    duplicate_ind = which(duplicate, arr.ind = TRUE)
+    duplicate_ind = unique(duplicate_ind)
+    not_duplicate = unique(next_ind)
+    ## points that are not duplicates
+    new_points = host_unique_pp3$data[not_duplicate]
+    chosen_points = rbind(chosen_points, new_points)
+
+    ## host pattern with previously used points removed
+    host_unique_pp3 = host_unique_pp3[-next_ind]
+
+    ## change duplicate back to full matrix form
+    duplicate = duplicate_mat
+
+    print(paste("loop duplicate ", sum(duplicate)))
+  }
+  dim(chosen_points)
+
+  # get coordinates of all original points and their selected neighbors
+  coords_multimer = rbind(coords(rcp_dope), data.frame(x = chosen_points$x, y = chosen_points$y, z =chosen_points$z))
+  dim(coords_multimer)
+
+  # make ppp and caluclate summary functions
+  rcp_box = ppp(x = coords_multimer$x, y = coords_multimer$y, window = box_2d)
+  rcp_G = Gest_nn(rcp_box, correction = "km", k = neighbor_number, r = seq(0, maxGr, length.out = nGr))
+  rcp_K =Kest(rcp_box, r = seq(0, maxKr, length.out= nKr))
+  summary = list(rrl_G = rcp_G, rrl_K = rcp_K)
+  return(summary)
+}
+
+#' Relabel multimers
+#'
+#' multimer
+#' DEPRACATED now use relabeler
+multimers_relab_v01 = function (exp_ppp, num_relabs, thickness, rcp_list, maxGr, maxKr,
+                            nGr, nKr,
+                            group_size = 2, num_neighbors = 6, neighbor_number = 1, weights = c(1, 1, 1/4),
+                            probs = c(0.6, 0.2, 0.2, 0),
+                            ncores = detectCores()) {
+
+  ## make vectors of maximum radii to take T tests to for K and G
+  G_rad_vec = seq(0, maxGr, length.out = (nGr/50) +1)
+  G_rad_vec = G_rad_vec[2:length(G_rad_vec)]
+  K_rad_vec = seq(0, maxKr, length.out = (nKr/50)+1)
+  K_rad_vec = K_rad_vec[2:length(K_rad_vec)]
+
+  ## number of relabelings per rcp pattern
+  nper = num_relabs/floor(length(rcp_list))
+  # index for which rcp pattern to use
+  ind = rep(1:length(rcp_list), nper)
+
+  cl = makeForkCluster(ncores, outfile = "outfile_test")
+  ##  calculate envelopes for length(ind) rcp multimer patterns
+  multimers = parLapply(cl, 1:length(ind), function(x) {
+    print(paste("start rep  ", x))
+    val = multimersim(exp_ppp, thickness = thickness, group_size = group_size,
+                      num_neighbors =num_neighbors, neighbor_number = neighbor_number, weights = weights, probs = probs,
+                      rcp_list[[ind[x]]],
+                      intensity_rcp = 1, maxGr = maxGr, maxKr = maxKr, nGr = nGr, nKr = nKr)
+    print(paste("end rep  ", x))
+    val
+  })
+
+  clusterExport(cl, "multimers", envir = environment())
+  # calculate T values for K and G summaries for a variety of max radii
+  multimers_T_G = parLapply(cl, G_rad_vec, function(x) {
+    Tcalc(multimers, x, func = "G", rmax =maxGr)
+  })
+  multimers_T_K = parLapply(cl, K_rad_vec, function(x) {
+    Tcalc(multimers, x, func = "K",rmax = maxKr)
+  })
+
+  # get the 95% CI envelope
+  multimers = rrl_averager(multimers, envelope_value = 0.95,  K_cor = "border", G_cor = "km") # use same name to get rid of the older (and enormous) object
+  stopCluster(cl)
+  return(list(relabs = multimers, T_G = multimers_T_G, T_K = multimers_T_K))
+}
+
+
+
+#' Create  RCP Pattern with same intensity and number of points as experimental pattern
+#' DEPRACATED now just mulimersim() funciton with group_size = 1
+func_rcp_simple_v01 = function(exp_ppp, thickness, rcp_pattern, neighbor_number = 1,
+                           intensity_rcp = 1, maxGr, maxKr, nGr, nKr) {
+  # get desired intensity
+  npoints = exp_ppp$n
+  print(npoints)
+  box_2d = exp_ppp$window
+  box_area = spatstat.geom::area(box_2d)
+
+  #vol = box_area * thickness
+  # intensity_exp = npoints / vol
+  # rescale RCP pattern to match physical system (1 point per nm)
+  rcp_scaled = rescaler(rcp_pattern, intensity_rcp)
+
+  # subset so that it is now only includes the points in the xy range of the TEM points and z range of thickness
+  rcp_box = subset(rcp_scaled, x > box_2d$xrange[1] & x < box_2d$xrange[2] &
+                     y > box_2d$yrange[1] & y < box_2d$yrange[2] &
+                     z >0 & z < thickness)
+  ## label n/2 points as dopant and the rest as host
+  n_irp = npoints
+  n_total = length(rcp_box$data$x)
+  n_host = n_total - n_irp
+  rcp_labeled = rlabel(rcp_box, labels = c(rep("A", n_irp) , rep("C", n_host)), permute = TRUE)
+  # extract dopant points
+  rcp_dope = subset(rcp_labeled, marks == "A")
+  # extract host points
+  #rcp_host = subset(rcp_labeled, marks == "C")
+
+  coords_dope = coords(rcp_dope)
+  #win_box = box3(box_2d$xrange, box_2d$yrange, c(0, thickness))
+  rcp_box = ppp(x = coords_dope$x, y = coords_dope$y, window = box_2d)
+
+  rcp_G = Gest_nn(rcp_box, correction = "km", k = neighbor_number, r = seq(0, maxGr, length.out = nGr))
+  rcp_K =Kest(rcp_box, r = seq(0, maxKr, length.out= nKr))
+  summary = list(rrl_G = rcp_G, rrl_K = rcp_K)
+  return(summary)
+}
+
+#' Perform num_relabs relabelings
+#' DEPRACATED now use relabler
+rcp_simple_relab_v01 = function(exp_ppp, num_relabs, thickness, neighbor_number =1, rcp_list, maxGr,
+                            maxKr, nGr, nKr, ncores = detectCores()) {
+
+  ## make vectors of maximum radii to take T tests to for K and G
+  G_rad_vec = seq(0, maxGr, length.out = (nGr/50) +1)
+  G_rad_vec = G_rad_vec[2:length(G_rad_vec)]
+  K_rad_vec = seq(0, maxKr, length.out = (nKr/50)+1)
+  K_rad_vec = K_rad_vec[2:length(K_rad_vec)]
+  nper = num_relabs/floor(length(rcp_list))
+  # index for which rcp pattern to use
+  ind = rep(1:length(rcp_list), nper)
+
+  ##  calculate envelopes for length(ind) rcp multimer patterns
+
+  cl = makeForkCluster(ncores, outfile = "outfile3")
+  rcp_simple = parLapply(cl, 1:length(ind), function(x) {
+    func_rcp_simple(exp_ppp, thickness = thickness, rcp_list[[ind[x]]], neighbor_number = neighbor_number,
+                    intensity_rcp = 1, maxGr = maxGr, maxKr = maxKr, nGr = nGr, nKr = nKr)
+  })
+
+
+  clusterExport(cl, "rcp_simple", envir = environment())
+  # calculate T values for K and G summaries for a variety of max radii
+  rcp_simple_T_G = parLapply(cl, G_rad_vec, function(x) {
+    Tcalc(rcp_simple, x, func = "G", rmax =maxGr)
+
+  })
+  rcp_simple_T_K = parLapply(cl, K_rad_vec, function(x) {
+    Tcalc(rcp_simple, x, func = "G", rmax = maxKr)
+  })
+  # get the 95% CI envelope
+  rcp_simple = rrl_averager(rcp_simple, envelope_value = 0.95,  K_cor = "border", G_cor = "km") # use same name to get rid of the older (and enormous) object
+  stopCluster(cl)
+  return(list(relabs = rcp_simple, T_G = rcp_simple_T_G, T_K = rcp_simple_T_K))
+}
+

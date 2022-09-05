@@ -5,8 +5,10 @@
 \title{Fraction of all neighbors within a distance that are same type or fraction of all nth nearest neighbors that are same type}
 \usage{
 percent_neighbors(
-  image,
+  pattern,
   i,
+  window = NULL,
+  drop_isolated = FALSE,
   value = "NN",
   rads_vec = 1:25,
   nn_vec = 1:5,
@@ -19,7 +21,7 @@ percent_neighbors(
 )
 }
 \arguments{
-\item{image}{Image of type ppp or pp3}
+\item{pattern}{Image of type ppp or pp3}
 
 \item{i}{mark for point type to be used}
 

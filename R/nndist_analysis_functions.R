@@ -106,21 +106,16 @@ nndist_func_plotter = function(image, image2 = NULL, nn_vec = 1:5, location = ge
 #' @return returns at matrix. If `value` = "percent", then rows are NN number, columns are distance, and value is percent.  If `value` = "distance",
 #'  rows are NN number, columns are percent, and `value` is distance.  If `output` = "save" then it will also save the image at location `location`
 #' @export
-nn_dist_perc_table = function(image, image2 = NULL, value = "percent",
-                        rads_vec = 1:25, nn_vec = 1:5,
-                        perc_vec = seq(0, 1, 0.1), output = "plot",
-                        location = getwd(),
-                        image_name = "image",
-                        unit = "nm", round_to = 2, ...) {
-  if (is.null(image2)) {
-    # If image2 is not given, use nndist on image
-    distances = nndist(image, k = nn_vec)
-  }
-
-  else {
-    # if image2 is given, use nncross(image, image2) and get rid of the `which` columns
-    distances = nncross(image, image2, k = nn_vec)[,1:length(nn_vec)]
-  }
+nn_dist_perc_table = function(pattern, pattern2 = NULL,
+                              window = NULL, drop_isolated = FALSE,
+                              value = "percent",
+                              rads_vec = 1:25, nn_vec = 1:5,
+                              perc_vec = seq(0, 1, 0.1), output = "plot",
+                              location = getwd(),
+                              pattern_name = "pattern",
+                              unit = "nm", round_to = 2, ...) {
+  distances = nndist_subset(pattern, pattern2, window, drop_isolated, k = nn_vec, output = "matrix")
+  distances = distances[complete.cases(distances),]
   # if the desired matrix data type is percent
   if (value == "percent") {
     # calculate the percent of values that are smaller than each rads_vec value for each nn_vec value
@@ -142,17 +137,17 @@ nn_dist_perc_table = function(image, image2 = NULL, value = "percent",
       print("Save")
       out %>% kable(caption = "Percent with all NN within Distance") %>%
         kable_styling(latex_options = c("striped")) %>%
-        save_kable(paste(location, "/", image_name, "_NN_dist_perc.png", sep = ""))
+        save_kable(paste(location, "/", pattern_name, "_NN_dist_perc.png", sep = ""))
       return(out)
     }
     else {
       print("Error: output must be either 'print' or 'save'")
     }
   }
- # if matrix values are distances
+  # if matrix values are distances
   else if (value == "distance") {
     # calulate the distances at which each percentage in perc_vec has each NN in nn_vec
-    out = apply(distances, 2, quantile, probs = perc_vec)
+    out = apply(distances[,nn_vec], 2, quantile, probs = perc_vec)
     colnames(out) =  sapply(nn_vec, function(x) { paste(x, "NN")})
     out = round(out,round_to)
     out = t(out)
@@ -165,7 +160,7 @@ nn_dist_perc_table = function(image, image2 = NULL, value = "percent",
       print("Save")
       out %>% kable(caption = "Distance at Which X% of points have Y NN's") %>%
         kable_styling(latex_options = c("striped")) %>%
-        save_kable(paste(location, "/", image_name, "_NN_perc_dist.png", sep = ""))
+        save_kable(paste(location, "/", pattern_name, "_NN_perc_dist.png", sep = ""))
       return(out)
     }
     else {
@@ -178,7 +173,7 @@ nn_dist_perc_table = function(image, image2 = NULL, value = "percent",
 }
 
 #' Fraction of all neighbors within a distance that are same type or fraction of all nth nearest neighbors that are same type
-#' @param image Image of type ppp or pp3
+#' @param pattern Image of type ppp or pp3
 #' @param i mark for point type to be used
 #' @param value Determines output.  If = "NN" then returns fraction of all nearest neighbors in nn_vec that are same type.  If = "distance" then returns fraction of
 #'  all points within distances in rads_vec that are same type
@@ -195,7 +190,9 @@ nn_dist_perc_table = function(image, image2 = NULL, value = "percent",
 #'
 #' @return vector of fractions
 #' @export
-percent_neighbors = function(image, i,  value = "NN",
+percent_neighbors = function(pattern, i,
+                             window = NULL, drop_isolated = FALSE,
+                             value = "NN",
                              rads_vec = 1:25, nn_vec = 1:5,
                             output = "plot",
                              location = getwd(),
@@ -203,20 +200,19 @@ percent_neighbors = function(image, i,  value = "NN",
                              unit = "nm", round_to = 3, ...) {
   # determine which output to use
   if (value == "NN") {
-    # must account for that the first NN will be reported to be the point itself (distance of 0)
-    nn_vec = nn_vec +1
-    # find distance from each point of type `i` to NN
-    dist = nncross(image[image$data$marks ==i], image, k = nn_vec)
+
+        # find distance from each point of type `i` to NN
+    dist = nndist_subset(pattern[pattern$data$marks ==i], pattern, k = nn_vec, window = NULL, drop_isolated = FALSE, output = "matrix")
     # fraction of NN's that is type `i`
     percent_neighbors = apply(dist[,(length(nn_vec)+1):(length(nn_vec)*2)], 2, function(x) {
-      type =image$data$marks[x]
+      type =pattern$data$marks[x]
       total =sum(type ==i)
       total/ nrow(dist)
     })
 
     # round and name output
     out =round(percent_neighbors, round_to)
-    names(out) = paste(nn_vec-1, "NN")
+    names(out) = paste(nn_vec, "NN")
     name = "Fraction of each NN that is same type"
   }
   # determine if using `distance` output
@@ -224,20 +220,20 @@ percent_neighbors = function(image, i,  value = "NN",
   {
     # all pairs of type `i` that are within each distance in `rads_vec`
     pairs_i = lapply(rads_vec, function(x) {
-      closepairs(image[image$data$marks ==i], x)
+      closepairs(pattern[pattern$data$marks ==i], x)
     })
     # total number of pairs per distance
     num_pairs_i = sapply(pairs_i, function(x) {length(x[[1]])})
 
     # pairs of points that involves at least one point of type `i` within each distance in `rads_vec`
     pairs_i_all = lapply(rads_vec, function(x) {
-      crosspairs(image[image$data$marks ==i], image, x)
+      crosspairs(pattern[pattern$data$marks ==i], pattern, x)
     })
 
     # total number of pairs_i_all per distance
     num_pairs_i_all = sapply(pairs_i_all, function(x) {length(x[[1]])})
     # must subtract off all of the pairs that are self - self
-    num_pairs_i_all = num_pairs_i_all - sum(image$data$marks ==i)
+    num_pairs_i_all = num_pairs_i_all - sum(pattern$data$marks ==i)
     # fraction that are type i to type -i
     out = num_pairs_i /num_pairs_i_all
     names(out) = paste(rads_vec, unit)
@@ -266,7 +262,7 @@ percent_neighbors = function(image, i,  value = "NN",
   }
 }
 
-
+#' Average data frames
 #' @description
 #' add description
 #'

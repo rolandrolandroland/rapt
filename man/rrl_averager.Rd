@@ -17,6 +17,8 @@ rrl_averager(
 }
 \arguments{
 \item{relabelings}{output of `relabeler` function}
+
+\item{envelope.value}{size of envelope to compute.  Should be decimal (e.g. 0.95 = 95%)}
 }
 \description{
 Functionto take all relabelings and return averages and envelope values

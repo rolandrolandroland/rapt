@@ -13,17 +13,29 @@
 #' @return pp3_new will preserve all properties of the input \emph{pattern}, except the intensity
 #' @export
 rescaler = function(pattern, new_intensity) {
-  intensity = spatstat.geom::intensity(pattern)
-  factor = (intensity / new_intensity)^(1/3)
-  coo = coords(pattern)
-  coo_scaled = coo*factor
+  intensity = sum(spatstat.geom::intensity(pattern))
+  if (is.pp3(pattern)) {
+    factor = (intensity / new_intensity)^(1/3)
+    coo = coords(pattern)
+    coo_scaled = coo*factor
 
-
-  win_scaled = box3((domain(pattern)$xrange*factor),
-                    (domain(pattern)$yrange*factor),
-                    (domain(pattern)$zrange*factor))
-  pp3_new = pp3(coo_scaled$x, coo_scaled$y, coo_scaled$z, win_scaled)
+    win_scaled = box3((domain(pattern)$xrange*factor),
+                      (domain(pattern)$yrange*factor),
+                      (domain(pattern)$zrange*factor))
+    out = pp3(coo_scaled$x, coo_scaled$y, coo_scaled$z, win_scaled)
+  }
+  else if (is.ppp(pattern)) {
+    factor = (intensity / new_intensity) ^ (1/2)
+    coo = coords(pattern)
+    coo_scaled = coo* factor
+    win_scaled = owin((domain(pattern)$xrange*factor),
+                      (domain(pattern)$yrange*factor))
+    out = ppp(coo_scaled$x, coo_scaled$y, win_scaled)
+  }
+  marks(out) = marks(pattern)
+  return(out)
 }
+
 
 #' Calculate T value
 #'
@@ -99,7 +111,7 @@ Tcalc = function(relabelings, func = "K", rmin = 0, rmax, K_cor = "border", G_co
 
 #' Functionto take all relabelings and return averages and envelope values
 #' @param relabelings output of `relabeler` function
-#' @param envelope.value
+#' @param envelope.value size of envelope to compute.  Should be decimal (e.g. 0.95 = 95%)
 #' @export
 rrl_averager = function(relabelings, envelope.value = .95,
                         funcs = c("K", "G"),
@@ -295,370 +307,11 @@ rrl_averager = function(relabelings, envelope.value = .95,
 
 
 
-#' Simulate 2D Multimers
-#' @description Simulate
-multimersim = function(exp_ppp,  thickness, group_size = 2,
-                       num_neighbors = 6, neighbor_number = 1, weights = c(1, 1, 1/4), probs = c(0.6, 0.2, 0.2, 0),
-                       rcp_pattern, intensity_rcp = 1, maxGr, maxKr, nGr, nKr) {
-  ## make probability vector same length as num_neighbors
-  if (num_neighbors > length(probs)) {
-    probs = c(probs, rep(0, num_neighbors - length(probs)))
-  }
-
-  # get desired intensity
-  npoints = exp_ppp$n
-  print(npoints)
-  box_2d = exp_ppp$window
-
-  box_area = area(box_2d)
-  #vol = box_area * thickness
-  # intensity_exp = npoints / vol
-  # rescale RCP pattern to match physical system (1 point per nm)
-  rcp_scaled = rescaler(rcp_pattern, intensity_rcp)
-
-  # subset so that it is now only includes the points in the xy range of the TEM points and z range of thickness
-  rcp_box = subset(rcp_scaled, x > box_2d$xrange[1] & x < box_2d$xrange[2] &
-                     y > box_2d$yrange[1] & y < box_2d$yrange[2] &
-                     z >0 & z < thickness)
-  ## label n/2 points as dopant and the rest as host
-  n_irp = npoints
-  n_total = length(rcp_box$data$x)
-  n_host = n_total - n_irp
-
-  # determine the number of groups of molecules to be present (if multimers, then n_irp/2)
-  n_groups = round(n_irp/ group_size,0)
-  rcp_labeled = rlabel(rcp_box, labels = c(rep("A",n_groups) , rep("C", length(rcp_box$data$x) - n_groups)), permute = TRUE)
-  # extract dopant points
-  rcp_dope = subset(rcp_labeled, marks == "A")
-  # extract host points
-  rcp_host = subset(rcp_labeled, marks == "C")
-  # find 6 nearest host to each dopant
-  nn_ind= lapply(1:num_neighbors, function(x) {
-    nncross(rcp_dope, rcp_host, k = x)
-  })
-
-  # get nn distance x, y, and z values for each neighbor
-  dist_coords = lapply(1:num_neighbors, function(x) {
-    coords(rcp_dope) - coords(rcp_host[nn_ind[[x]][,2]])
-  })
-  # this just rearranges dist_coords to be grouped by point rather than neighbor order
-  holder = c()
-  neighbors = lapply(1:nrow(dist_coords[[1]]), function(x) {
-    for (i in 1:length(dist_coords)) {
-      holder = rbind(holder, dist_coords[[i]][x,])
-    }
-    return(holder)
-  })
-
-  # rank each of the nearest neighbors based upon distance and weights (distance will be mostly x-y distance)
-  # rank will be from smallest to largest
-  ranks = lapply(1:length(neighbors), function(outer) {
-    distances = sapply(1:nrow(neighbors[[outer]]), function(inner) {
-      sqrt(weights[1]*neighbors[[outer]]$x[inner]^2 + weights[2]*neighbors[[outer]]$y[inner]^2 +weights[3]*neighbors[[outer]]$z[inner]^2)
-    })
-    order(distances)
-    rank(distances)
-  })
-
-  # semi randomly select one of the neighbors, prefering onces with lower x-y distance
-  which_neighbor = t(sapply(1:length(ranks), function(i) {
-    sample(1:num_neighbors, size =group_size-1, prob = probs[ranks[[i]]])
-  }))
-  if (group_size == 2) {
-    which_neighbor = which_neighbor[1,]
-  }
-
-  which_neighbor = cbind(1:(length(which_neighbor)/(group_size-1)), which_neighbor)
-
-  # get the coordinates of the semi randomly selected neighbor
-  ind= t(sapply(1:nrow(which_neighbor), function(i) {
-    sapply(2:(group_size), function(j) {
-      nn_ind[[which_neighbor[i,j]]][i,2]
-    })
-  }))
-
-  #duplicate = apply(ind, 2, duplicated)
-  #duplicate = duplicated(c(ind))
-  duplicate = duplicated(ind, MARGIN = 0)
-  duplicate_ind = which(duplicate, arr.ind = TRUE)[,1]
-  duplicate_ind = unique(duplicate_ind)
-  not_duplicate = ind[!duplicate]
-  ## points that are not duplicates
-  chosen_points = rcp_host$data[not_duplicate]
-
-
-  ## host pattern with previously used points removed
-  host_unique_pp3 = rcp_host[-ind]
-  #unique_points = rcp_host$data[-ind[duplicate],]
-  print(paste("first duplicate ", sum(duplicate)))
-
-
-  ### for each duplicate nearest neighbor (whenever the same host is the nearest neighbor for two dopants )
-  # take the 2nd nearest neighbor
-  while (sum(duplicate >0) ) {
-
-    # find 6 nearest host to each dopant
-    next_nn= lapply(1:num_neighbors, function(x) {
-      nncross(rcp_dope, host_unique_pp3, k = x)
-    })
-
-    ####
-    dist_coords = lapply(1:num_neighbors, function(x) {
-      coords(rcp_dope) - coords(host_unique_pp3[next_nn[[x]][,2]])
-    })
-    ####
-
-    # this just rearranges dist_coords to be grouped by point rather than neighbor order
-    holder = c()
-    neighbors = lapply(1:nrow(dist_coords[[1]]), function(x) {
-      for (i in 1:length(dist_coords)) {
-        holder = rbind(holder, dist_coords[[i]][x,])
-      }
-      return(holder)
-    })
-
-    # rank each of the nearest neighbors based upon distance and weights (distance will be mostly x-y distance)
-    # rank will be from smallest to largest
-    ranks = lapply(1:length(neighbors), function(outer) {
-      distances = sapply(1:nrow(neighbors[[outer]]), function(inner) {
-        sqrt(weights[1]*neighbors[[outer]]$x[inner]^2 + weights[2]*neighbors[[outer]]$y[inner]^2 +weights[3]*neighbors[[outer]]$z[inner]^2)
-      })
-      order(distances)
-      rank(distances)
-    })
-
-
-    # semi randomly select one of the neighbors, prefering onces with lower x-y distance
-    which_neighbor = t(sapply(1:length(ranks), function(i) {
-      sample(1:num_neighbors, size =group_size-1, prob = probs[ranks[[i]]])
-    }))
-    if (group_size == 2) {
-      which_neighbor = which_neighbor[1,]
-    }
-    which_neighbor = cbind(1:(length(which_neighbor)/(group_size-1)), which_neighbor)
-
-
-    # get the coordinates of the semi randomly selected neighbor
-    all_ind= t(sapply(1:nrow(which_neighbor), function(i) {
-      sapply(2:(group_size), function(j) {
-        next_nn[[which_neighbor[i,j]]][i,2]
-      })
-    }))
-
-    #ind[duplicate] = all_ind[duplicate]
-    #all_ind = c(all_ind)
-    # duplicate = c(duplicate)
-    # extract just the ones needed to replace duplicates
-    next_ind =all_ind[duplicate]
-
-    ## use two duplicates - one that has the index of duplicates in entire all_ind, one that has actual new duplicates
-    #new = all_ind[duplicate]
-    mat_1 = matrix(FALSE, nrow = nrow(all_ind), ncol = ncol(all_ind))
-    mat_1[duplicate] = all_ind[duplicate]
-    # zeros = test ==0
-    duplicate_mat = duplicated(mat_1, MARGIN = 0)
-    duplicate_mat[mat_1==0] = FALSE
-
-
-    ## get duplicates and their index
-    duplicate = duplicated(next_ind, MARGIN = 0)
-    duplicate_ind = which(duplicate, arr.ind = TRUE)
-    duplicate_ind = unique(duplicate_ind)
-    not_duplicate = unique(next_ind)
-    ## points that are not duplicates
-    new_points = host_unique_pp3$data[not_duplicate]
-    chosen_points = rbind(chosen_points, new_points)
-
-    ## host pattern with previously used points removed
-    host_unique_pp3 = host_unique_pp3[-next_ind]
-
-    ## change duplicate back to full matrix form
-    duplicate = duplicate_mat
-
-    print(paste("loop duplicate ", sum(duplicate)))
-  }
-  dim(chosen_points)
-
-  # get coordinates of all original points and their selected neighbors
-  coords_multimer = rbind(coords(rcp_dope), data.frame(x = chosen_points$x, y = chosen_points$y, z =chosen_points$z))
-  dim(coords_multimer)
-
-  # make ppp and caluclate summary functions
-  rcp_box = ppp(x = coords_multimer$x, y = coords_multimer$y, window = box_2d)
-  rcp_G = Gest_nn(rcp_box, correction = "km", k = neighbor_number, r = seq(0, maxGr, length.out = nGr))
-  rcp_K =Kest(rcp_box, r = seq(0, maxKr, length.out= nKr))
-  summary = list(rrl_G = rcp_G, rrl_K = rcp_K)
-  return(summary)
-}
-
-#' Relabel multimers
-#'
-#' multimer
-#' @export
-multimers_relab = function (exp_ppp, num_relabs, thickness, rcp_list, maxGr, maxKr,
-                            nGr, nKr,
-                            group_size = 2, num_neighbors = 6, neighbor_number = 1, weights = c(1, 1, 1/4),
-                            probs = c(0.6, 0.2, 0.2, 0),
-                            ncores = detectCores()) {
-
-  ## make vectors of maximum radii to take T tests to for K and G
-  G_rad_vec = seq(0, maxGr, length.out = (nGr/50) +1)
-  G_rad_vec = G_rad_vec[2:length(G_rad_vec)]
-  K_rad_vec = seq(0, maxKr, length.out = (nKr/50)+1)
-  K_rad_vec = K_rad_vec[2:length(K_rad_vec)]
-
-  ## number of relabelings per rcp pattern
-  nper = num_relabs/floor(length(rcp_list))
-  # index for which rcp pattern to use
-  ind = rep(1:length(rcp_list), nper)
-
-  cl = makeForkCluster(ncores, outfile = "outfile_test")
-  ##  calculate envelopes for length(ind) rcp multimer patterns
-  multimers = parLapply(cl, 1:length(ind), function(x) {
-    print(paste("start rep  ", x))
-    val = multimersim(exp_ppp, thickness = thickness, group_size = group_size,
-                      num_neighbors =num_neighbors, neighbor_number = neighbor_number, weights = weights, probs = probs,
-                      rcp_list[[ind[x]]],
-                      intensity_rcp = 1, maxGr = maxGr, maxKr = maxKr, nGr = nGr, nKr = nKr)
-    print(paste("end rep  ", x))
-    val
-  })
-
-  clusterExport(cl, "multimers", envir = environment())
-  # calculate T values for K and G summaries for a variety of max radii
-  multimers_T_G = parLapply(cl, G_rad_vec, function(x) {
-    Tcalc(multimers, x, func = "G", rmax =maxGr)
-  })
-  multimers_T_K = parLapply(cl, K_rad_vec, function(x) {
-    Tcalc(multimers, x, func = "K",rmax = maxKr)
-  })
-
-  # get the 95% CI envelope
-  multimers = rrl_averager(multimers, envelope_value = 0.95,  K_cor = "border", G_cor = "km") # use same name to get rid of the older (and enormous) object
-  stopCluster(cl)
-  return(list(relabs = multimers, T_G = multimers_T_G, T_K = multimers_T_K))
-}
 
 
 
 
-## functions for RCP
-#' @export
-func_rcp_simple = function(exp_ppp, thickness, rcp_pattern, neighbor_number = 1,
-                           intensity_rcp = 1, maxGr, maxKr, nGr, nKr) {
-  # get desired intensity
-  npoints = exp_ppp$n
-  print(npoints)
-  box_2d = exp_ppp$window
-  box_area = area(box_2d)
-  #vol = box_area * thickness
-  # intensity_exp = npoints / vol
-  # rescale RCP pattern to match physical system (1 point per nm)
-  rcp_scaled = rescaler(rcp_pattern, intensity_rcp)
-
-  # subset so that it is now only includes the points in the xy range of the TEM points and z range of thickness
-  rcp_box = subset(rcp_scaled, x > box_2d$xrange[1] & x < box_2d$xrange[2] &
-                     y > box_2d$yrange[1] & y < box_2d$yrange[2] &
-                     z >0 & z < thickness)
-  ## label n/2 points as dopant and the rest as host
-  n_irp = npoints
-  n_total = length(rcp_box$data$x)
-  n_host = n_total - n_irp
-  rcp_labeled = rlabel(rcp_box, labels = c(rep("A", n_irp) , rep("C", n_host)), permute = TRUE)
-  # extract dopant points
-  rcp_dope = subset(rcp_labeled, marks == "A")
-  # extract host points
-  #rcp_host = subset(rcp_labeled, marks == "C")
-
-  coords_dope = coords(rcp_dope)
-  #win_box = box3(box_2d$xrange, box_2d$yrange, c(0, thickness))
-  rcp_box = ppp(x = coords_dope$x, y = coords_dope$y, window = box_2d)
-
-  rcp_G = Gest_nn(rcp_box, correction = "km", k =neighbor_number, r = seq(0, maxGr, length.out = nGr))
-  rcp_K =Kest(rcp_box, r = seq(0, maxKr, length.out= nKr))
-  summary = list(rrl_G = rcp_G, rrl_K = rcp_K)
-  return(summary)
-}
-
-#' Create  RCP Pattern with same intensity and number of points as experimental pattern
-#' @export
-func_rcp_simple = function(exp_ppp, thickness, rcp_pattern, neighbor_number = 1,
-                           intensity_rcp = 1, maxGr, maxKr, nGr, nKr) {
-  # get desired intensity
-  npoints = exp_ppp$n
-  print(npoints)
-  box_2d = exp_ppp$window
-  box_area = area(box_2d)
-
-  #vol = box_area * thickness
-  # intensity_exp = npoints / vol
-  # rescale RCP pattern to match physical system (1 point per nm)
-  rcp_scaled = rescaler(rcp_pattern, intensity_rcp)
-
-  # subset so that it is now only includes the points in the xy range of the TEM points and z range of thickness
-  rcp_box = subset(rcp_scaled, x > box_2d$xrange[1] & x < box_2d$xrange[2] &
-                     y > box_2d$yrange[1] & y < box_2d$yrange[2] &
-                     z >0 & z < thickness)
-  ## label n/2 points as dopant and the rest as host
-  n_irp = npoints
-  n_total = length(rcp_box$data$x)
-  n_host = n_total - n_irp
-  rcp_labeled = rlabel(rcp_box, labels = c(rep("A", n_irp) , rep("C", n_host)), permute = TRUE)
-  # extract dopant points
-  rcp_dope = subset(rcp_labeled, marks == "A")
-  # extract host points
-  #rcp_host = subset(rcp_labeled, marks == "C")
-
-  coords_dope = coords(rcp_dope)
-  #win_box = box3(box_2d$xrange, box_2d$yrange, c(0, thickness))
-  rcp_box = ppp(x = coords_dope$x, y = coords_dope$y, window = box_2d)
-
-  rcp_G = Gest_nn(rcp_box, correction = "km", k = neighbor_number, r = seq(0, maxGr, length.out = nGr))
-  rcp_K =Kest(rcp_box, r = seq(0, maxKr, length.out= nKr))
-  summary = list(rrl_G = rcp_G, rrl_K = rcp_K)
-  return(summary)
-}
-
-#' Perform num_relabs relabelings
-#' @export
-rcp_simple_relab = function(exp_ppp, num_relabs, thickness, neighbor_number =1, rcp_list, maxGr,
-                            maxKr, nGr, nKr, ncores = detectCores()) {
-
-  ## make vectors of maximum radii to take T tests to for K and G
-  G_rad_vec = seq(0, maxGr, length.out = (nGr/50) +1)
-  G_rad_vec = G_rad_vec[2:length(G_rad_vec)]
-  K_rad_vec = seq(0, maxKr, length.out = (nKr/50)+1)
-  K_rad_vec = K_rad_vec[2:length(K_rad_vec)]
-  nper = num_relabs/floor(length(rcp_list))
-  # index for which rcp pattern to use
-  ind = rep(1:length(rcp_list), nper)
-
-  ##  calculate envelopes for length(ind) rcp multimer patterns
-
-  cl = makeForkCluster(ncores, outfile = "outfile3")
-  rcp_simple = parLapply(cl, 1:length(ind), function(x) {
-    func_rcp_simple(exp_ppp, thickness = thickness, rcp_list[[ind[x]]], neighbor_number = neighbor_number,
-                    intensity_rcp = 1, maxGr = maxGr, maxKr = maxKr, nGr = nGr, nKr = nKr)
-  })
-
-
-  clusterExport(cl, "rcp_simple", envir = environment())
-  # calculate T values for K and G summaries for a variety of max radii
-  rcp_simple_T_G = parLapply(cl, G_rad_vec, function(x) {
-    Tcalc(rcp_simple, x, func = "G", rmax =maxGr)
-
-  })
-  rcp_simple_T_K = parLapply(cl, K_rad_vec, function(x) {
-    Tcalc(rcp_simple, x, func = "G", rmax = maxKr)
-  })
-  # get the 95% CI envelope
-  rcp_simple = rrl_averager(rcp_simple, envelope_value = 0.95,  K_cor = "border", G_cor = "km") # use same name to get rid of the older (and enormous) object
-  stopCluster(cl)
-  return(list(relabs = rcp_simple, T_G = rcp_simple_T_G, T_K = rcp_simple_T_K))
-}
-
-
-### Relabel input point pattern and calcluate summary functions
+#' Relabel input point pattern and calcluate summary functions
 #' @param seed number to use in `set.seed` for reproducibility
 #' @param funcs vector of summary functions to calculate
 #' @param pattern point pattern of type ppp or pp3
@@ -676,7 +329,7 @@ rcp_simple_relab = function(exp_ppp, num_relabs, thickness, neighbor_number =1, 
 #' @return summary functions listed in `funcs` variable
 #' @export
 relabeler = function(seed, funcs = c("K", "G", "F", "GXGH"), pattern,
-                     dopant_formula, host_formula,
+                     dopant_formula, host_formula, k = 1,
                      K_cor = "trans", G_cor = "km", F_cor = "km",
                      GXGH_cor = "km", GXHG_cor = "km", ...) {
   # set seed to make sure each random relabeling is different
@@ -724,7 +377,7 @@ relabeler = function(seed, funcs = c("K", "G", "F", "GXGH"), pattern,
       rrl_K = Kest(dopant_relabeled, r = seq(0, maxKr, length.out = nKr), correction = K_cor)
     }
     if ("G" %in% funcs) {
-      rrl_G = Gest(dopant_relabeled, r = seq(0, maxGr, length.out = nGr), correction = G_cor)
+      rrl_G = Gest_nn(dopant_relabeled, r = seq(0, maxGr, length.out = nGr), correction = G_cor, k = k)
     }
     if ("F" %in% funcs) {
       rrl_F = Fest(dopant_relabeled, r = seq(0, maxGr, length.out = nGr), correction = F_cor)
@@ -764,7 +417,7 @@ relabeler = function(seed, funcs = c("K", "G", "F", "GXGH"), pattern,
 #' of class ppp or pp3.
 #' @export
 summary_functions = function(funcs = c("K", "G", "F", "GXGH"), pattern, ...,
-                             dopant_formula, host_formula,
+                             dopant_formula, host_formula, k = 1,
                              K_cor = "trans", G_cor = "km", F_cor = "km",
                              GXGH_cor = "km", GXHG_cor = "km") {
 
@@ -798,20 +451,20 @@ summary_functions = function(funcs = c("K", "G", "F", "GXGH"), pattern, ...,
   }
   else if (is.ppp(pattern)) {
     if ("K" %in% funcs) {
-      K = Kest(dopant_relabeled, r = seq(0, maxKr, length.out = nKr), correction = K_cor)
+      K = Kest(pattern_dopant, r = seq(0, maxKr, length.out = nKr), correction = K_cor)
     }
     if ("G" %in% funcs) {
-      G = Gest(dopant_relabeled, r = seq(0, maxGr, length.out = nGr), correction = G_cor)
+      G = Gest_nn(pattern_dopant, r = seq(0, maxGr, length.out = nGr), correction = G_cor, k = k)
     }
     if ("F" %in% funcs) {
-      F = Fest(dopant_relabeled, r = seq(0, maxGr, length.out = nGr), correction = F_cor)
+      F = Fest(pattern_dopant, r = seq(0, maxGr, length.out = nGr), correction = F_cor)
     }
     if ("GXGH" %in% funcs) {
-      GXGH = Gcross(relabeled, i = dopant_formula, j = host_formula,
+      GXGH = Gcross(pattern, i = dopant_formula, j = host_formula,
                         r = seq(0, maxGXGHr, length.out = nGXr), correction = GXGH_cor)
     }
     if ("GXHG" %in% funcs) {
-      GXHG = Gcross(relabeled, i = host_formula, j = dopant_formula,
+      GXHG = Gcross(pattern, i = host_formula, j = dopant_formula,
                         r = seq(0, maxGXHGr, length.out = nGXr), correction =GXHG_cor)
     }
   }
@@ -828,7 +481,7 @@ summary_functions = function(funcs = c("K", "G", "F", "GXGH"), pattern, ...,
 #' Plot summary functions
 #' @param func Summary function to plot
 #' @param observed_values observed summary function value
-#' @param relabeled_values theoretical values found by function such as `summary_functions()`
+#' @param envelopes theoretical values found by function such as `summary_functions().` Should be list
 #' @param pattern.colors colors and names for envelope lines
 #' @param fill.colors colors and names for envelope fill.  Match names to `pattern.colors`
 #' @param K_cor edge correction(s) to be used for K function
@@ -839,159 +492,482 @@ summary_functions = function(funcs = c("K", "G", "F", "GXGH"), pattern, ...,
 #'
 #' @description Plot the observed value with envelopes for expected values for summary function
 #' @export
+
 summary_plotter = function(func = "K",
-                           observed_values, relabeled_values,
+                           observed_values, envelopes, ...,
                            pattern.colors = c("95.0% AI" = "pink", "Median"  = "black", "Observed" = "blue"),
-                           fill.colors = c("95.0% AI" = "pink", "Median"  = "black", "Observed" = "blue"),
+                           fill.colors = pattern.colors, unit = "nm",
                            K_cor = "trans", G_cor = "km", F_cor = "km",
-                           GXGH_cor = "km", GXHG_cor = "km",
-                           ...)
+                           GXGH_cor = "km", GXHG_cor = "km")
 {
   if (func =="K") {
-    baseline = sqrt(relabeled_values$rrl_K$mmean)
+    long = as.data.frame(envelopes[[1]]$rrl_K)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    i = 1
+    while (i < length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_K)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+      i = i+1
+    }
+
+    baseline = sqrt(envelopes[[1]]$rrl_K$mmean)
 
     observed = as.data.frame(observed_values$K)
-    observed = observed[, K_cor]
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, K_cor],
+                          lo =  observed[, K_cor], hi =  observed[, K_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
 
-    relabeled_values$rrl_K %>% ggplot(aes(x = r,ymin = sqrt(lo) - baseline, ymax = sqrt(hi) - baseline, color = "95.0% AI", fill = "95.0% AI")) +
-      geom_ribbon()+
-      geom_line(aes( y = sqrt(mmean) - baseline,col = "Median", fill = "Median"), size =2) +
-      geom_line(aes(y = sqrt(observed) - baseline, color = "Observed", fill = "Observed"), size = 2) +
-      theme(plot.title = element_text(hjust = 0.5, size = 60),
-            panel.background = element_rect(fill = "white"),
-            axis.text.x = element_text(size = 30),
-            axis.text.y = element_text(size = 30),
-            panel.border = element_rect(linetype = "solid", fill = NA),
-            axis.title = element_text(size = 40),
-            legend.key.size = unit(20, 'pt'),
-            legend.text = element_text(size = 20),
-            #legend.title = element_text(size = 20, hjust = 0.5),
-            legend.position = c(0.15, 0.80),
-            legend.title=element_blank(),
-            legend.background = element_rect(fill = "white", color = "black")) +
-      guides(color = FALSE) +
-      labs(color = "Pattern", fill = "Pattern") + scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
-      xlab("Radius (nm)") + ylab(expression(tilde(K)[g](r)))
+    gplot = long %>% ggplot(aes(x = r, ymin = sqrt(lo) - baseline,
+                                ymax = sqrt(hi) - baseline, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(tilde(K)[g](r)))
 
   }
 
   ## plot for G
   else if (func == "G") {
-    baseline = relabeled_values$rrl_G$mmean
+    long = as.data.frame(envelopes[[1]]$rrl_G)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    i = 1
+    while (i < length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_G)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+      i= i+1
+    }
+
+    baseline = (envelopes[[1]]$rrl_G$mmean)
 
     observed = as.data.frame(observed_values$G)
-    observed = observed[, G_cor]
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, G_cor],
+                          lo =  observed[, G_cor], hi =  observed[, G_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
 
-    relabeled_values$rrl_G %>% ggplot(aes(x = r, ymin = (lo) - baseline, ymax = (hi) - baseline, color = "95.0% AI", fill = "95.0% AI")) +
-      geom_ribbon() +
-      geom_line(aes( y = mmean - baseline,col = "Median", fill = "Median"))  +
-      geom_line(aes(y = observed - baseline, color = "Observed", fill = "Observed"), size = 2)+
-      theme(plot.title = element_text(hjust = 0.5, size = 60),
-            panel.background = element_rect(fill = "white"),
-            axis.text.x = element_text(size = 30),
-            axis.text.y = element_text(size = 30),
-            panel.border = element_rect(linetype = "solid", fill = NA),
-            axis.title = element_text(size = 40),
-            legend.key.size = unit(20, 'pt'),
-            legend.text = element_text(size = 20),
-            #legend.title = element_text(size = 20, hjust = 0.5),
-            legend.position = c(0.75, 0.80),
-            legend.title=element_blank(),
-            legend.background = element_rect(fill = "white", color = "black")) +
-      guides(color = FALSE) +
-      labs(color = "Pattern", fill = "Pattern") + scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
-      xlab("Radius (nm)") + ylab(expression(tilde(G)[g](r)))
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo) - baseline,
+                                ymax = (hi) - baseline, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(tilde(G)[g](r)))
 
   }
 
 
   ### Plot for F
-  else if (func =="F") {
-    baseline = relabeled_values$rrl_F$mmean
+  else if (func == "F") {
+    long = as.data.frame(envelopes[[1]]$rrl_F)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    i = 1
+    while (i < length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_F)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+      i = i+1
+    }
+
+    baseline = (envelopes[[1]]$rrl_F$mmean)
 
     observed = as.data.frame(observed_values$F)
-    observed = observed[, F_cor]
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, F_cor],
+                          lo =  observed[, F_cor], hi =  observed[, F_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
 
-    relabeled_values$rrl_F%>% ggplot(aes(x = r, ymin = (lo) - baseline, ymax = (hi) - baseline, color = "95.0% AI", fill = "95.0% AI")) +
-      geom_ribbon() +
-      geom_line(aes( y = (mmean) - baseline,col = "Median", fill = "Median"))  +
-      geom_line(aes(y = observed - baseline, color = "Observed", fill = "Observed"), size = 2)+
-      theme(plot.title = element_text(hjust = 0.5, size = 60),
-            panel.background = element_rect(fill = "white"),
-            axis.text.x = element_text(size = 30),
-            axis.text.y = element_text(size = 30),
-            panel.border = element_rect(linetype = "solid", fill = NA),
-            axis.title = element_text(size = 40),
-            legend.key.size = unit(20, 'pt'),
-            legend.text = element_text(size = 20),
-            #legend.title = element_text(size = 20, hjust = 0.5),
-            legend.position = c(0.75, 0.80),
-            legend.title=element_blank(),
-            legend.background = element_rect(fill = "white", color = "black")) +
-      guides(color = FALSE) +
-      labs(color = "Pattern", fill = "Pattern") + scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
-      xlab("Radius (nm)") + ylab(expression(tilde(F)[g](r)))
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo) - baseline,
+                                ymax = (hi) - baseline, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(tilde(F)[g](r)))
 
   }
 
   ### Plot for GXGH
   else if (func =="GXGH") {
-    baseline = relabeled_values$rrl_GXGH$mmean
+    long = as.data.frame(envelopes[[1]]$rrl_GXGH)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    i = 1
+    while (i < length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_GXGH)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+      i = i+1
+    }
+
+    baseline = (envelopes[[1]]$rrl_GXGH$mmean)
 
     observed = as.data.frame(observed_values$GXGH)
-    observed = observed[, GXGH_cor]
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, GXGH_cor],
+                          lo =  observed[, GXGH_cor], hi =  observed[, GXGH_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
 
-    relabeled_values$rrl_GXGH%>% ggplot(aes(x = r, ymin = (lo) - baseline, ymax = (hi) - baseline, color = "95.0% AI", fill = "95.0% AI")) +
-      geom_ribbon() +
-      geom_line(aes( y = (mmean) - baseline,col = "Median", fill = "Median"))  +
-      geom_line(aes(y = observed - baseline, color = "Observed", fill = "Observed"), size = 2)+
-      theme(plot.title = element_text(hjust = 0.5, size = 60),
-            panel.background = element_rect(fill = "white"),
-            axis.text.x = element_text(size = 30),
-            axis.text.y = element_text(size = 30),
-            panel.border = element_rect(linetype = "solid", fill = NA),
-            axis.title = element_text(size = 40),
-            legend.key.size = unit(20, 'pt'),
-            legend.text = element_text(size = 20),
-            #legend.title = element_text(size = 20, hjust = 0.5),
-            legend.position = c(0.75, 0.80),
-            legend.title=element_blank(),
-            legend.background = element_rect(fill = "white", color = "black")) +
-      guides(color = FALSE) +
-      labs(color = "Pattern", fill = "Pattern") + scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
-      xlab("Radius (nm)") + ylab(expression(tilde(G)[gh](r)))
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo) - baseline,
+                                ymax = (hi) - baseline, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
 
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(tilde(G)[gh](r)))
   }
 
   ### Plot for GXHG
   else if (func =="GXHG") {
-    baseline = relabeled_values$rrl_GXHG$mmean
+    long = as.data.frame(envelopes[[1]]$rrl_GXHG)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    i = 1
+    while (i < length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_GXHG)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+      i = i+1
+    }
+
+    baseline = (envelopes[[1]]$rrl_GXHG$mmean)
 
     observed = as.data.frame(observed_values$GXHG)
-    observed = observed[, GXHG_cor]
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, GXHG_cor],
+                          lo =  observed[, GXHG_cor], hi =  observed[, GXHG_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
 
-    relabeled_values$rrl_GXHG%>% ggplot(aes(x = r, ymin = (lo) - baseline, ymax = (hi) - baseline, color = "95.0% AI", fill = "95.0% AI")) +
-      geom_ribbon() +
-      geom_line(aes( y = (mmean) - baseline,col = "Median", fill = "Median"))  +
-      geom_line(aes(y = observed - baseline, color = "Observed", fill = "Observed"), size = 2)+
-      theme(plot.title = element_text(hjust = 0.5, size = 60),
-            panel.background = element_rect(fill = "white"),
-            axis.text.x = element_text(size = 30),
-            axis.text.y = element_text(size = 30),
-            panel.border = element_rect(linetype = "solid", fill = NA),
-            axis.title = element_text(size = 40),
-            legend.key.size = unit(20, 'pt'),
-            legend.text = element_text(size = 20),
-            #legend.title = element_text(size = 20, hjust = 0.5),
-            legend.position = c(0.75, 0.80),
-            legend.title=element_blank(),
-            legend.background = element_rect(fill = "white", color = "black")) +
-      guides(color = FALSE) +
-      labs(color = "Pattern", fill = "Pattern") + scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
-      xlab("Radius (nm)") + ylab(expression(tilde(G)[hg](r)))
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo) - baseline,
+                                ymax = (hi) - baseline, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
 
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(tilde(G)[hg](r)))
   }
 }
+
+#' Plot summary functions
+#' @param func Summary function to plot
+#' @param observed_values observed summary function value
+#' @param envelopes theoretical values found by function such as `summary_functions().` Should be list
+#' @param pattern.colors colors and names for envelope lines
+#' @param fill.colors colors and names for envelope fill.  Match names to `pattern.colors`
+#' @param K_cor edge correction(s) to be used for K function
+#' @param G_cor edge correction(s) to be used for G function
+#' @param F_cor edge correction(s) to be used for F function
+#' @param GXGH_cor edge correction(s) to be used for GXGH function
+#' @param GXHG_cor edge correction(s) to be used for GXHG function
+#'
+#' @description Plot the observed value with envelopes for expected values for summary function
+#' @export
+summary_plotter_raw = function(func = "K",
+                           observed_values, envelopes, ...,
+                           pattern.colors = c("95.0% AI" = "pink", "Median"  = "black", "Observed" = "blue"),
+                           fill.colors = pattern.colors, unit = "nm",
+                           K_cor = "trans", G_cor = "km", F_cor = "km",
+                           GXGH_cor = "km", GXHG_cor = "km")
+{
+  if (func =="K") {
+    long = as.data.frame(envelopes[[1]]$rrl_K)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    for (i in 2:length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_K)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+    }
+
+
+    observed = as.data.frame(observed_values$K)
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, K_cor],
+                          lo =  observed[, K_cor], hi =  observed[, K_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
+
+    gplot = long %>% ggplot(aes(x = r, ymin = lo ,
+                                ymax = hi , color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(K[g](r)))
+
+  }
+
+  ## plot for G
+  else if (func == "G") {
+    long = as.data.frame(envelopes[[1]]$rrl_G)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    for (i in 2:length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_G)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+    }
+
+    observed = as.data.frame(observed_values$G)
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, G_cor],
+                          lo =  observed[, G_cor], hi =  observed[, G_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
+
+    gplot = long %>% ggplot(aes(x = r, ymin = lo ,
+                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(G[g](r)))
+
+  }
+
+
+  ### Plot for F
+  else if (func == "F") {
+    long = as.data.frame(envelopes[[1]]$rrl_F)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    for (i in 2:length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_F)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+    }
+
+    observed = as.data.frame(observed_values$F)
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, F_cor],
+                          lo =  observed[, F_cor], hi =  observed[, F_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
+
+    gplot = long %>% ggplot(aes(x = r, ymin = lo,
+                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(F[g](r)))
+
+  }
+
+  ### Plot for GXGH
+  else if (func =="GXGH") {
+    long = as.data.frame(envelopes[[1]]$rrl_GXGH)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    for (i in 2:length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_GXGH)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+    }
+
+
+    observed = as.data.frame(observed_values$GXGH)
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, GXGH_cor],
+                          lo =  observed[, GXGH_cor], hi =  observed[, GXGH_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
+
+    gplot = long %>% ggplot(aes(x = r, ymin = lo,
+                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(G[gh](r)))
+  }
+
+  ### Plot for GXHG
+  else if (func =="GXHG") {
+    long = as.data.frame(envelopes[[1]]$rrl_GXHG)
+    long$type = as.factor(1)
+    long$type = names(pattern.colors)[1]
+
+    head(long)
+    for (i in 2:length(envelopes)) {
+      temp = as.data.frame(envelopes[[i]]$rrl_GXHG)
+      temp$type = as.factor(i)
+      temp$type = names(pattern.colors)[i]
+      long = rbind(long, temp)
+    }
+
+    observed = as.data.frame(observed_values$GXHG)
+    observed = data.frame(r = observed$r,
+                          mmean =  observed[, GXHG_cor],
+                          lo =  observed[, GXHG_cor], hi =  observed[, GXHG_cor],
+                          type = "Observed")
+    long = rbind(long, observed)
+
+    gplot = long %>% ggplot(aes(x = r, ymin = lo,
+                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+      geom_hline(yintercept = 0)
+
+    gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
+                  panel.background = element_rect(fill = "white"),
+                  axis.text.x = element_text(size = 30),
+                  axis.text.y = element_text(size = 30),
+                  panel.border = element_rect(linetype = "solid", fill = NA),
+                  axis.title = element_text(size = 40),
+                  legend.key.size = unit(20, 'pt'),
+                  legend.text = element_text(size = 20),
+                  #legend.title = element_text(size = 20, hjust = 0.5),
+                  legend.position = c(0.75, 0.80),
+                  legend.title=element_blank(),
+                  legend.background = element_rect(fill = "white", color = "black"), ...) +
+      guides(color = 'none') +
+      scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
+      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(G[hg](r)))
+  }
+}
+
+
 
 #' Tiler function
 #' @param pattern input pp3 pattern

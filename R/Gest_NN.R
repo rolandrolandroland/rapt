@@ -18,7 +18,7 @@
     ##
     W <- X$window
     npts <- npoints(X)
-    lambda <- npts/area(W)
+    lambda <- npts/spatstat.geom::area(W)
 
     ## determine r values
     rmaxdefault <- rmax.rule("G", W, lambda)
@@ -86,7 +86,7 @@
         ##  uncensored distances
         x <- nnd[d]
         ##  weights
-        a <- eroded.areas(W, rvals, subset=domain)
+        a <- spatstat.geom::eroded.areas(W, rvals, subset=domain)
         ## calculate Hanisch estimator
         h <- hist(x[x <= rmax], breaks=breaks$val, plot=FALSE)$counts
         G <- cumsum(h/a)

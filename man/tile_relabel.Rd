@@ -25,14 +25,30 @@ tile_relabel(
 )
 }
 \arguments{
+\item{seed}{input for `set.seed` function (for reproducibility)}
+
 \item{pp3_full}{input pp3 pattern for relabeling and tiling}
 
-\item{host_formula, dopant_formula}{formula for}
+\item{funcs}{summary functions to calculate on relabeling}
 
-\item{seeed}{input for `set.seed` function (for reproducibility)}
+\item{host_formula, dopant_formula}{formula for host and dopant marks.  Summary functions
+will be calculated from dopant type points}
 
-\item{summary}{functions to calculate on relabeling}
+\item{x_tiles, y_tiles, z_tiles}{number of tiles in each dimension (set equal to 1 for no change)}
+
+\item{z_trim, y_trim, z_trim}{amount to trim off of each dimension.  Trimming will be applied equall to both sides}
+
+\item{K_cor}{edge correction(s) to be used for K function}
+
+\item{G_cor}{edge correction(s) to be used for G function}
+
+\item{F_cor}{edge correction(s) to be used for F function}
+
+\item{GXGH_cor}{edge correction(s) to be used for GXGH function}
+
+\item{GXHG_cor}{edge correction(s) to be used for GXHG function}
 }
 \description{
-Tile and then relabel
+This function takes an input pp3 point pattern, relabels it, then
+tiles the relabeled point pattern.  Then it calculates summary functions on it
 }

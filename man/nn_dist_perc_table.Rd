@@ -5,15 +5,17 @@
 \title{Plot and Save Histograms of nndist function}
 \usage{
 nn_dist_perc_table(
-  image,
-  image2 = NULL,
+  pattern,
+  pattern2 = NULL,
+  window = NULL,
+  drop_isolated = FALSE,
   value = "percent",
   rads_vec = 1:25,
   nn_vec = 1:5,
   perc_vec = seq(0, 1, 0.1),
   output = "plot",
   location = getwd(),
-  image_name = "image",
+  pattern_name = "pattern",
   unit = "nm",
   round_to = 2,
   ...
