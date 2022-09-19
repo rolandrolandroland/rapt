@@ -5,12 +5,19 @@
 \title{function to calculate all summary functions on point pattern}
 \usage{
 summary_functions(
-  funcs = c("K", "G", "F", "GXGH"),
   pattern,
-  ...,
+  funcs = c("K", "G", "F", "GXGH"),
   dopant_formula,
   host_formula,
   k = 1,
+  maxKr = 10,
+  nKr = 200,
+  maxGr = 5,
+  nGr = 1000,
+  maxGXGHr = 3,
+  maxGXHGr = 8,
+  nGXr = 1000,
+  vside = 0.3,
   K_cor = "trans",
   G_cor = "km",
   F_cor = "km",
@@ -19,11 +26,9 @@ summary_functions(
 )
 }
 \arguments{
-\item{funcs}{vector of summary functions to calculate}
-
 \item{pattern}{point pattern of type ppp or pp3}
 
-\item{...}{maxKr, nKr, maxGr, nGr, maxGXGHr, maxGXHGr, nGXr}
+\item{funcs}{vector of summary functions to calculate}
 
 \item{dopant_formula}{mark of points from which to calculate summary functions}
 
@@ -38,6 +43,8 @@ summary_functions(
 \item{GXGH_cor}{edge correction(s) to be used for GXGH function}
 
 \item{GXHG_cor}{edge correction(s) to be used for GXHG function}
+
+\item{...}{maxKr, nKr, maxGr, nGr, maxGXGHr, maxGXHGr, nGXr}
 }
 \description{
 Cacluate that summary functions included in `funcs` on `pattern`, a point pattern

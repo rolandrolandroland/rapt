@@ -149,8 +149,8 @@ rrl_averager = function(relabelings, envelope.value = .95,
     ordered = apply(mmean, 1, sort)
 
     # get index of high and low envelope values and find values at each index
-    hi.ind = round(length(relabelings) * envelope.value, 0)
-    lo.ind = round(length(relabelings) * (1-envelope.value), 0)
+    hi.ind = round((length(relabelings) +1) * envelope.value, 0)
+    lo.ind = round((length(relabelings) +1)* (1-envelope.value), 0)
     if (lo.ind == 0) {
       lo.ind = 1
     }
@@ -328,10 +328,12 @@ rrl_averager = function(relabelings, envelope.value = .95,
 #' same ratio of marks, and calculates summary functions
 #' @return summary functions listed in `funcs` variable
 #' @export
-relabeler = function(seed, funcs = c("K", "G", "F", "GXGH"), pattern,
+relabeler = function(seed,  pattern, funcs = c("K", "G", "F", "GXGH"),
                      dopant_formula, host_formula, k = 1,
+                     maxKr = 10, nKr = 200, maxGr = 5, nGr = 1000,
+                     maxGXGHr = 3, maxGXHGr = 8, nGXr = 1000, vside = 0.3,
                      K_cor = "trans", G_cor = "km", F_cor = "km",
-                     GXGH_cor = "km", GXHG_cor = "km", ...) {
+                     GXGH_cor = "km", GXHG_cor = "km") {
   # set seed to make sure each random relabeling is different
   set.seed(seed)
 
@@ -416,8 +418,10 @@ relabeler = function(seed, funcs = c("K", "G", "F", "GXGH"), pattern,
 #' @description Cacluate that summary functions included in `funcs` on `pattern`, a point pattern
 #' of class ppp or pp3.
 #' @export
-summary_functions = function(funcs = c("K", "G", "F", "GXGH"), pattern, ...,
+summary_functions = function(pattern, funcs = c("K", "G", "F", "GXGH"),
                              dopant_formula, host_formula, k = 1,
+                             maxKr = 10, nKr = 200, maxGr = 5, nGr = 1000,
+                             maxGXGHr = 3, maxGXHGr = 8, nGXr = 1000, vside = 0.3,
                              K_cor = "trans", G_cor = "km", F_cor = "km",
                              GXGH_cor = "km", GXHG_cor = "km") {
 
@@ -1086,6 +1090,8 @@ tile_relabel = function(seed, pp3_full, funcs = c("K", "G", "F", "GXGH"), ...,
                         host_formula, dopant_formula,
                         x_tiles = 1, y_tiles = 1, z_tiles = 1,
                         x_trim = 0, y_trim = 0, z_trim = 0,
+                        maxKr = 10, nKr = 200, maxGr = 5, nGr = 1000,
+                        maxGXGHr = 3, maxGXHGr = 8, nGXr = 1000, vside = 0.3,
                         K_cor = "border", G_cor = "rs", F_cor = "rs",
                         GXGH_cor = "rs", GXHG_cor = "rs") {
 

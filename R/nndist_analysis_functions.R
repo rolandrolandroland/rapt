@@ -202,7 +202,9 @@ percent_neighbors = function(pattern, i,
   if (value == "NN") {
 
         # find distance from each point of type `i` to NN
-    dist = nndist_subset(pattern[pattern$data$marks ==i], pattern, k = nn_vec, window = NULL, drop_isolated = FALSE, output = "matrix")
+    dist = nndist_subset(pattern[pattern$data$marks ==i], pattern, k = nn_vec, window = window,
+                         drop_isolated = drop_isolated, output = "matrix")
+    dist = dist[complete.cases(dist),]
     # fraction of NN's that is type `i`
     percent_neighbors = apply(dist[,(length(nn_vec)+1):(length(nn_vec)*2)], 2, function(x) {
       type =pattern$data$marks[x]

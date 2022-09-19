@@ -6,25 +6,32 @@
 \usage{
 relabeler(
   seed,
-  funcs = c("K", "G", "F", "GXGH"),
   pattern,
+  funcs = c("K", "G", "F", "GXGH"),
   dopant_formula,
   host_formula,
   k = 1,
+  maxKr = 10,
+  nKr = 200,
+  maxGr = 5,
+  nGr = 1000,
+  maxGXGHr = 3,
+  maxGXHGr = 8,
+  nGXr = 1000,
+  vside = 0.3,
   K_cor = "trans",
   G_cor = "km",
   F_cor = "km",
   GXGH_cor = "km",
-  GXHG_cor = "km",
-  ...
+  GXHG_cor = "km"
 )
 }
 \arguments{
 \item{seed}{number to use in `set.seed` for reproducibility}
 
-\item{funcs}{vector of summary functions to calculate}
-
 \item{pattern}{point pattern of type ppp or pp3}
+
+\item{funcs}{vector of summary functions to calculate}
 
 \item{dopant_formula}{mark of points from which to calculate summary functions}
 
