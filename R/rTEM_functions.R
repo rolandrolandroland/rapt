@@ -510,7 +510,7 @@ summary_plotter = function(func = "K",
     long$type = names(pattern.colors)[1]
 
     i = 1
-    while (i < length(envelopes)) {
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_K)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
@@ -556,7 +556,7 @@ summary_plotter = function(func = "K",
 
     head(long)
     i = 1
-    while (i < length(envelopes)) {
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_G)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
@@ -603,7 +603,7 @@ summary_plotter = function(func = "K",
     long$type = names(pattern.colors)[1]
 
     i = 1
-    while (i < length(envelopes)) {
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_F)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
@@ -650,7 +650,7 @@ summary_plotter = function(func = "K",
 
     head(long)
     i = 1
-    while (i < length(envelopes)) {
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_GXGH)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
@@ -696,7 +696,7 @@ summary_plotter = function(func = "K",
 
     head(long)
     i = 1
-    while (i < length(envelopes)) {
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_GXHG)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
@@ -761,12 +761,13 @@ summary_plotter_raw = function(func = "K",
     long$type = as.factor(1)
     long$type = names(pattern.colors)[1]
 
-    head(long)
-    for (i in 2:length(envelopes)) {
+    i = 1
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_K)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
       long = rbind(long, temp)
+      i = i+1
     }
 
 
@@ -777,8 +778,8 @@ summary_plotter_raw = function(func = "K",
                           type = "Observed")
     long = rbind(long, observed)
 
-    gplot = long %>% ggplot(aes(x = r, ymin = lo ,
-                                ymax = hi , color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+    gplot = long %>% ggplot(aes(x = r, ymin = lo,
+                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
       geom_hline(yintercept = 0)
     gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
                   panel.background = element_rect(fill = "white"),
@@ -794,7 +795,7 @@ summary_plotter_raw = function(func = "K",
                   legend.background = element_rect(fill = "white", color = "black"), ...) +
       guides(color = 'none') +
       scale_color_manual(values = pattern.colors) + scale_fill_manual(values = fill.colors) +
-      xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(K[g](r)))
+      xlab(paste("Radius (", unit, ")", sep = "")) +ylab(expression(K[g](r)))
 
   }
 
@@ -805,12 +806,15 @@ summary_plotter_raw = function(func = "K",
     long$type = names(pattern.colors)[1]
 
     head(long)
-    for (i in 2:length(envelopes)) {
+    i = 1
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_G)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
       long = rbind(long, temp)
+      i= i+1
     }
+
 
     observed = as.data.frame(observed_values$G)
     observed = data.frame(r = observed$r,
@@ -819,8 +823,8 @@ summary_plotter_raw = function(func = "K",
                           type = "Observed")
     long = rbind(long, observed)
 
-    gplot = long %>% ggplot(aes(x = r, ymin = lo ,
-                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo),
+                                ymax = (hi), color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
       geom_hline(yintercept = 0)
 
     gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
@@ -848,13 +852,15 @@ summary_plotter_raw = function(func = "K",
     long$type = as.factor(1)
     long$type = names(pattern.colors)[1]
 
-    head(long)
-    for (i in 2:length(envelopes)) {
+    i = 1
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_F)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
       long = rbind(long, temp)
+      i = i+1
     }
+
 
     observed = as.data.frame(observed_values$F)
     observed = data.frame(r = observed$r,
@@ -863,8 +869,8 @@ summary_plotter_raw = function(func = "K",
                           type = "Observed")
     long = rbind(long, observed)
 
-    gplot = long %>% ggplot(aes(x = r, ymin = lo,
-                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo) ,
+                                ymax = (hi) , color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
       geom_hline(yintercept = 0)
 
     gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
@@ -892,13 +898,16 @@ summary_plotter_raw = function(func = "K",
     long$type = names(pattern.colors)[1]
 
     head(long)
-    for (i in 2:length(envelopes)) {
+    i = 1
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_GXGH)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
       long = rbind(long, temp)
+      i = i+1
     }
 
+    baseline = (envelopes[[1]]$rrl_GXGH$mmean)
 
     observed = as.data.frame(observed_values$GXGH)
     observed = data.frame(r = observed$r,
@@ -907,8 +916,8 @@ summary_plotter_raw = function(func = "K",
                           type = "Observed")
     long = rbind(long, observed)
 
-    gplot = long %>% ggplot(aes(x = r, ymin = lo,
-                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo) ,
+                                ymax = (hi) , color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
       geom_hline(yintercept = 0)
 
     gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
@@ -935,12 +944,15 @@ summary_plotter_raw = function(func = "K",
     long$type = names(pattern.colors)[1]
 
     head(long)
-    for (i in 2:length(envelopes)) {
+    i = 1
+    while (i <= length(envelopes)) {
       temp = as.data.frame(envelopes[[i]]$rrl_GXHG)
       temp$type = as.factor(i)
       temp$type = names(pattern.colors)[i]
       long = rbind(long, temp)
+      i = i+1
     }
+
 
     observed = as.data.frame(observed_values$GXHG)
     observed = data.frame(r = observed$r,
@@ -949,8 +961,8 @@ summary_plotter_raw = function(func = "K",
                           type = "Observed")
     long = rbind(long, observed)
 
-    gplot = long %>% ggplot(aes(x = r, ymin = lo,
-                                ymax = hi, color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
+    gplot = long %>% ggplot(aes(x = r, ymin = (lo) ,
+                                ymax = (hi) , color = type, fill = type)) + geom_ribbon(alpha = 0.5) +
       geom_hline(yintercept = 0)
 
     gplot + theme(plot.title = element_text(hjust = 0.5, size = 60),
@@ -970,6 +982,7 @@ summary_plotter_raw = function(func = "K",
       xlab(paste("Radius (", unit, ")", sep = "")) + ylab(expression(G[hg](r)))
   }
 }
+
 
 
 
