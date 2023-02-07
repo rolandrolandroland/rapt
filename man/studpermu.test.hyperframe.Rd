@@ -10,5 +10,5 @@
 Studentised Permutation Test
 }
 \seealso{
-\code{\link[spatstat.core]{studpermu.test}}
+\code{\link[spatstat.explore]{studpermu.test}}
 }

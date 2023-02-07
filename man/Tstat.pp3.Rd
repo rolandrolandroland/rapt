@@ -40,7 +40,7 @@ which can be plotted directly using \code{\link[spatstat]{plot.fv}}.
 }
 \description{
 Tstat.pp3 extends the third-order summary statistic
-\code{\link[spatstat.core]{Tstat}} to pp3
+\code{\link[spatstat.explore]{Tstat}} to pp3
 }
 \details{
 This command calculates the third-order summary statistic \eqn{T(r)} for a

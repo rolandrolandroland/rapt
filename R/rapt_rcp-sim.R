@@ -38,7 +38,7 @@
 #' @export
 read.rcp <- function(fpath_config, fpath_sys = NULL,
                      scaleUp = FALSE, newRadius = 0.5) {
-  if (is.null(fpath_sys & scaleUp)) {
+  if (is.null(fpath_sys) & scaleUp) {
     stop("fpath_sys must be specified for scaling")
   }
   rcp <- read.table(fpath_config,

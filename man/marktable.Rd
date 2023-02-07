@@ -24,10 +24,10 @@ point.}
 }
 \description{
 This is an S3 generic that extends the use of
-\code{\link[spatstat.core]{marktable}} beyond "ppp" objects.
+\code{\link[spatstat.explore]{marktable}} beyond "ppp" objects.
 }
 \seealso{
-\code{\link[spatstat.core]{marktable.ppp}}, \code{\link{marktable.pp3}}
+\code{\link[spatstat.explore]{marktable.ppp}}, \code{\link{marktable.pp3}}
 
 Other spatstat extensions: 
 \code{\link{G3cross}()},

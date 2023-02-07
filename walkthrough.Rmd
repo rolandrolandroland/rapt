@@ -1,11 +1,12 @@
 ---
-title: 'Cluster Characterization in Atom Probe Tomography: Machine Learning using
-  Multiple Summary Functions- Additional Supplementary Information'
+title: "Cluster Characterization in Atom Probe Tomography: Machine Learning using
+  Multiple Summary Functions- Additional Supplementary Information"
 author: "Roland A Bennett, Andrew P. Proudian, Jeramy D. Zimmerman"
 date: "March 2022"
-output:
-  html_document:
+output: 
+  pdf_document:
     number_sections: true
+
 ---
 This is a companion to the main paper which will help the user make user of our model. The full model used in the paper is done on a high performance computing system, so here we will be showing a scaled down version. 
 
@@ -14,27 +15,75 @@ We utilize a variety of $R$ packages, mostly $spatstat$ and our own $rapt$. The 
 
 Contact: Roland Bennett (graduate student): rolandbennett@mines.edu, Jeramy Zimmerman (Professor): jdzimmer@mines.edu
 
-If you would like to use the data that we have already generated (training size =  1458, testing sizes = 365), then include the `load("walkthrough_data.RData")` command below and keep the `evaluate` variable set to `FALSE`.  If you would like to run it yourself, comment out the `load` and set `evaluate` to `TRUE`
+If you would like to use the data that we have already generated (training size =  1458, testing sizes = 365), then include the `load("walkthrough_data.RData")` command below and keep the `evaluate` variable set to `FALSE`.  If you would like to run it yourself, comment out the `load` and set `evaluate` to `TRUE`.  This will take a long time on a standard desktop/laptop, unless you scale the simulation down (reduce number of relabelings `n_relabs` or training data `nrand`) 
+
 ```{r setup, echo=FALSE}
 
 load("walkthrough_data.RData")
 ```
 
 Load the required packages
-```{r load packages, message=FALSE}
+```{r load packages, message=FALSE, echo=FALSE}
 ## if rapt is not yet installed
 #library(devtools)
-#install_github("rolandrolandroland/rapt", ref = "master")
+#install_github("aproudian2/rapt")
 ## if rapt is already installed, skip the above two lines
 
+if(!require(rapt)){
+  if(!require(devtools)){
+    install.packages("devtools")
+    library(devtools)
+    }
+    install_github("aproudian2/rapt")
+    library(rapt)
+}
+
+if(!require(doParallel)){
+    install.packages("doParallel")
+    library(doParallel)
+}
+
+
+if(!require(spatstat)){
+    install.packages("spatstat")
+    library(spatstat)
+}
+
+
+if(!require(spatstat.utils)){
+    install.packages("spatstat.utils")
+    library(spatstat.utils)
+}
+
+
+if(!require(dplyr)){
+    install.packages("dplyr")
+    library(dplyr)
+}
+
+if(!require(dplyr)){
+    install.packages("dplyr")
+    library(dplyr)
+}
+
+if(!require(caret)){
+    install.packages("caret")
+    library(caret)
+}
+
+if(!require(brnn)){
+    install.packages("brnn")
+    library(brnn)
+}
+
 evaluate <- FALSE
-library(rapt)
-library(doParallel)
-library(spatstat.utils)
-library(spatstat)
-library(dplyr)
-library(caret)
-library(brnn)
+#library(rapt)
+#library(doParallel)
+#library(spatstat.utils)
+#library(spatstat)
+#library(dplyr)
+#library(caret)
+#library(brnn)
 ```
 
 # Simulation Parameters
@@ -50,7 +99,8 @@ vside <- 0.3
 # maxGXHDr = 10
 nKr <- 100 # number of radius values at whih to calculate GT
 pcp <- 0.05114235 # percentage of points to assign as dopant
-tol <- 0.005 # percent by which dopant points can deviate from expected before cluster simulation fails
+tol <- 0.005 # percent by which dopant points can deviate
+# from expected before cluster simulation fails
 intensity <- 1.005 # total intensity of point pattern points/unit^3
 size <- c(0, 60) # dimensions for pattern
 
@@ -70,7 +120,8 @@ Note: for this example, we are using only 100 relabelings in order to reduce the
 box_size <- box3(xrange = size, yrange = size, zrange = size)
 pp3_box <- rpoispp3(lambda = intensity, domain = box_size, nsim = 1)
 pp3_box <- rlabel(pp3_box,
-  labels = as.factor(c(rep("A", pcp * 10000), rep("C", 10000 * (1 - pcp)))), permute = FALSE
+  labels = as.factor(c(rep("A", pcp * 10000), rep("C", 10000 * (1 - pcp)))),
+  permute = FALSE
 )
 pp3_dopant_box <- pp3_box[marks(pp3_box) == "A"]
 pp3_box
@@ -159,7 +210,7 @@ feats <- c(G_feats, F_feats, K_feats, GXGH_feats)
 param_names <- c("cr", "rhoc", "rhob", "rb", "pb")
 ```
 
-The \italic{create_training_data()} function is used to generate our training and testing data.  It takes a point pattern (pp3 object), assigns labels so that it exhibits clustering based upon the input parameters $\rho_c$ (intra cluster density), $\rho_b$ (background density), $\mu_r$ (mean cluster radius), $\delta r$ (radius dispersity), and $pb$ (position blur).  Summary function are calculated on this newly labeled pattern and then compared to the expected values (from the relabeling done previously) to extract our features_  
+The `create_training_data()` function is used to generate our training and testing data.  It takes a point pattern (pp3 object), assigns labels so that it exhibits clustering based upon the input parameters $\rho_c$ (intra cluster density), $\rho_b$ (background density), $\mu_r$ (mean cluster radius), $\delta r$ (radius dispersity), and $pb$ (position blur).  Summary function are calculated on this newly labeled pattern and then compared to the expected values (from the relabeling done previously) to extract our features_  
 
 Now we will actually perform the training.  First, we will generate input parameters using a random uniform distribution across our chosen intervals.  
 ```{r training, eval = evaluate}
@@ -189,8 +240,10 @@ pattern <- pp3_box
 train_gen_start <- as.numeric(Sys.time())
 # Generate training data using parameters and relabled objects above
 ncores <- detectCores() -1
-cl <- makePSOCKcluster(ncores, setup_strategy = "sequential", outfile = "output_file") # Create a PSOCK cluster containing the number of cores earlier specified
-invisible(clusterEvalQ(cl, c(library(rapt), library(zoo), library(dplyr), library(spatstat.utils))))
+# Create a PSOCK cluster containing the number of cores earlier specified
+cl <- makePSOCKcluster(ncores, setup_strategy = "sequential", outfile = "output_file") 
+invisible(clusterEvalQ(cl, c(library(rapt), library(zoo),
+                             library(dplyr), library(spatstat.utils))))
 # Load the rapt and zoo libraries into the parallel computing environment
 
 clusterExport(cl, c("params", "dopant_formula", "host_formula", 
@@ -220,7 +273,8 @@ train_data_list <- lapply(train_data_list, function(set) {
   }
 })
 # transform from list to matrix
-train_data <- matrix(unlist(train_data_list), byrow = TRUE, ncol = length(train_data_list[[1]]))
+train_data <- matrix(unlist(train_data_list), byrow = TRUE, 
+                     ncol = length(train_data_list[[1]]))
 
 # give column names
 # give column names
@@ -240,7 +294,8 @@ If you want to predict weighted radius, then calculate it for each cluster
 ```{r add_rw, eval = evaluate}
 # add rw
 sigma <- train_data[, "cr"] * train_data[, "rb"]
-train_data$rw <- (train_data[, "cr"]^4 + 6 * train_data[, "cr"]^2 * sigma^2 + 3 * sigma^4) /
+train_data$rw <- (train_data[, "cr"]^4 + 6 * train_data[, "cr"]^2 *
+                    sigma^2 + 3 * sigma^4) /
   (train_data[, "cr"]^3 + 3 * train_data[, "cr"] * sigma^2)
 
 ind <- round(nrow(train_data) * 4 / 5, 0)
@@ -276,7 +331,8 @@ trainer <- function(to_predict, train_data, test_data, features) {
   MAE <- mean(abs(test_data[, to_predict] - a))
   MPE <- mean(abs((test_data[, to_predict] - a) / test_data[, to_predict])) * 100
   cycle_time <- as.numeric(Sys.time()) - cycle_start
-  list(preds = a, RMSE = RMSE, RMSPE = RMSPE, MAE = MAE, MPE = MPE, cycle_time = cycle_time)
+  list(preds = a, RMSE = RMSE, RMSPE = RMSPE, 
+       MAE = MAE, MPE = MPE, cycle_time = cycle_time)
 }
 ```
 
@@ -327,10 +383,12 @@ error_plot <- function(diff.perc, percs, cols, ...) {
     vals[[i + 1]] <- vals$all[(ind[i] + 1):ind[i + 1], ]
     n.i <- nrow(vals[[i + 1]])
     points(vals[[i + 1]]$perc, vals[[i + 1]]$error, pch = 16, col = cols[i], cex = 1)
-    segments(-10, tail(vals[[i + 1]]$error, n = 1), tail(vals[[i + 1]]$perc, n = 1), tail(vals[[i + 1]]$error, n = 1),
+    segments(-10, tail(vals[[i + 1]]$error, n = 1), tail(vals[[i + 1]]$perc, n = 1),
+             tail(vals[[i + 1]]$error, n = 1),
       col = cols[i], lwd = 2, lty = 2
     )
-    segments(tail(vals[[i + 1]]$perc, n = 1), -10, tail(vals[[i + 1]]$perc, n = 1), tail(vals[[i + 1]]$error, n = 1),
+    segments(tail(vals[[i + 1]]$perc, n = 1), -10, tail(vals[[i + 1]]$perc, n = 1),
+             tail(vals[[i + 1]]$error, n = 1),
       col = cols[i], lwd = 2, lty = 2
     )
   }
@@ -349,20 +407,25 @@ est_plot <- function(diff.perc, percs, cols, pred, obs, ...) {
   vals.subed <- list("all" = sorted)
   ind <- rep(0, length(percs) + 1)
   ind.last <- (tail(ind, n = 1) + 1):n
-  points(vals.subed$all$obs[ind.last], vals.subed$all$pred[ind.last], col = "black", pch = 16, cex = 0.3)
+  points(vals.subed$all$obs[ind.last], vals.subed$all$pred[ind.last], 
+         col = "black", pch = 16, cex = 0.3)
   for (i in length(percs):1) {
     ind[i + 1] <- round(n * percs[i] / 100)
     vals.subed[[i + 1]] <- sorted[(ind[i] + 1):ind[i + 1], ]
     n.i <- nrow(vals.subed[[i + 1]])
-    points(vals.subed[[i + 1]]$obs, vals.subed[[i + 1]]$pred, pch = 16, cex = 0.3, col = cols[i])
+    points(vals.subed[[i + 1]]$obs, vals.subed[[i + 1]]$pred, pch = 16,
+           cex = 0.3, col = cols[i])
   }
 
   abline(0, 1, col = "black", lty = 2, lwd = 1.5)
 }
+figShow = "asis"
+figWidth = "75%"
+margins = c(5, 5, 1, 0.5)
 ```
 
-```{r rho_b_plots, fig.show="hold", out.width="40%"}
-par(mar = c(5, 5, 1, 1))
+```{r rho_c_plots, fig.show=figShow, out.width=figWidth}
+par(mar = margins)
 
 obs <- test_data[, "rhoc"]
 pred <- preds[[1]][[1]]
@@ -379,7 +442,8 @@ est_plot(diff.perc, c(50, 75, 90), brewer.pal(3, "Set1"),
 )
 legend("bottomright",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"),
+  title = "Error Percentile", cex = 1.5
 )
 mtext(
   side = 2, font = 2, expression(paste("Estimated ", rho[c])),
@@ -400,11 +464,13 @@ mtext(side = 2, font = 1, "Percent Error (%)", cex = 2, line = 3.25)
 axis(side = 2, at = seq(0, 10, 1), labels = T, cex.axis = 1.5)
 legend("topleft",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), 
+  title = "Error Percentile", cex = 1.5
 )
+```
 
-
-
+```{r rho_b_plots, fig.show=figShow, out.width=figWidth}
+par(mar = margins)
 
 # rhob est plot for combo 26, G, K, GXDH, F
 obs <- test_data[, "rhob"]
@@ -431,7 +497,8 @@ mtext(
 )
 legend("bottomright",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"),
+  title = "Error Percentile", cex = 1.5
 )
 
 error_plot(diff.perc, c(50, 75, 90), brewer.pal(3, "Set1"),
@@ -444,10 +511,13 @@ mtext(side = 2, font = 1, "Percent Error (%)", cex = 2, line = 3.25)
 axis(side = 2, at = seq(0, 10, 1), labels = T, cex.axis = 1.5)
 legend("topleft",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), 
+  title = "Error Percentile", cex = 1.5
 )
+```
 
-
+```{r cr_plots, fig.show=figShow, out.width=figWidth}
+par(mar = margins)
 
 obs <- test_data[, "cr"]
 pred <- preds[[3]][[1]]
@@ -471,7 +541,8 @@ mtext(
 )
 legend("bottomright",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"),
+  title = "Error Percentile", cex = 1.5
 )
 
 error_plot(diff.perc, c(50, 75, 90), brewer.pal(3, "Set1"),
@@ -484,9 +555,13 @@ mtext(side = 2, font = 1, "Percent Error (%)", cex = 2, line = 3.25)
 axis(side = 2, at = seq(0, 50, 5), labels = T, cex.axis = 1.5)
 legend("topleft",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"),
+  title = "Error Percentile", cex = 1.5
 )
+```
 
+```{r rb_plots, fig.show=figShow, out.width=figWidth}
+par(mar = margins)
 
 obs <- test_data[, "rb"]
 pred <- preds[[4]][[1]]
@@ -509,7 +584,8 @@ mtext(
 )
 legend("bottomright",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"),
+  title = "Error Percentile", cex = 1.5
 )
 
 error_plot(diff.perc, c(50, 75, 90), brewer.pal(3, "Set1"),
@@ -523,9 +599,13 @@ mtext(side = 2, font = 1, "Percent Error (%)", cex = 2, line = 3.25)
 axis(side = 2, at = seq(0, 150, 10), labels = T, cex.axis = 1.5)
 legend("topleft",
   legend = c("0%-50%", "50%-75%", "75%-90%", "90%-100%"),
-  pch = 16, col = c(brewer.pal(3, "Set1"), "black"), title = "Error Percentile", cex = 1.5
+  pch = 16, col = c(brewer.pal(3, "Set1"), "black"),
+  title = "Error Percentile", cex = 1.5
 )
+```
 
+```{r rw_plots, fig.show=figShow, out.width=figWidth}
+par(mar = margins)
 
 # rw
 obs <- test_data[, "rw"]
