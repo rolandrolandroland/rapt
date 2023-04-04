@@ -4,7 +4,15 @@
 \alias{G3cross}
 \title{Multitype Nearest Neighbour Distance Function (i-to-j)}
 \usage{
-G3cross(X, i, j, rmax = NULL, nrval = 128, correction = c("rs", "km", "han"))
+G3cross(
+  X,
+  i,
+  j,
+  rmax = NULL,
+  nrval = 128,
+  k = 1,
+  correction = c("rs", "km", "han")
+)
 }
 \arguments{
 \item{X}{The observed point pattern, from which an estimate of the cross type
@@ -107,6 +115,7 @@ uncorrected empirical \eqn{G[3ij](r)} as if it were an unbiased estimator of
 \code{\link[spatstat.geom]{marks}}
 
 Other spatstat extensions: 
+\code{\link{G3est_nn}()},
 \code{\link{G3multi}()},
 \code{\link{K3scaled}()},
 \code{\link{Tstat.pp3}()},

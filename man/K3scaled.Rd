@@ -39,6 +39,7 @@ Estimates the locally-rescaled K-function of a 3D point pattern
 
 Other spatstat extensions: 
 \code{\link{G3cross}()},
+\code{\link{G3est_nn}()},
 \code{\link{G3multi}()},
 \code{\link{Tstat.pp3}()},
 \code{\link{bdist.points}()},

@@ -605,6 +605,270 @@ quadratcount.pp3 <- function(X, nx = 5, ny = 5, nz = 5) {
 #'
 quantess.pp3 <- function(M, Z, n, ..., type = 2, origin = c(0, 0), eps = NULL) {}
 
+#### G3est_nn ####
+#' Extended Nearest Neighbour Distance Function
+#'
+#' For a marked point pattern, estimate the distribution of the distance from a
+#' typical point to the kth nearest point of subset
+#'
+#' @param X The observed point pattern, from which an estimate of the
+#'   kth nearest neightbor distance distribution function \eqn{G[3g](r)} will be computed.
+#' @param k calculate distance to kth nearest neighbor
+#' @param rmax Optional. Maximum value of argument *r* for which \eqn{G[3g](r)}
+#'   will be estimated.
+#' @param nrval Optional. Number of values of *r* for which \eqn{G[3g](r)} will
+#'   be estimated. A large value of `nrval` is required to avoid discretisation
+#'   effects.
+#' @param correction Optional. Character string specifying the edge
+#'   correction(s) to be used. Options are `"none"`, `"rs"`, `"km"`,
+#'   `"hanisch"`, and `"best"`. Alternatively `correction="all"` selects all
+#'   options.
+#'
+#' @details
+#'
+#' The function `G3est_nn` extends \code{\link[spatstat.explore]{G3est}} to higher order NN's
+#'
+#' @family spatstat extensions
+#'
+#' @seealso \code{\link{G3multi}}, \code{\link{G3cross}}, \code{\link[spatstat.explore]{G3est}}
+#'
+#' @export
+G3est_nn = function(X, k =1,
+                    rmax = NULL, nrval = 128,
+                    disjoint = NULL,
+                    correction = c("rs", "km", "han")) {
+  spatstat.geom::verifyclass(X, "pp3")
+  W <- X$domain
+  npts <- spatstat.geom::npoints(X)
+  volW <- spatstat.geom::volume(W)
+  if (is.null(rmax)) {
+    rmax <- spatstat.geom::diameter(W) / 2
+  }
+  n = npoints(X)
+  if (is.null(correction)) {
+    correction <- c("rs", "km", "han")
+  }
+  correction <- pickoption("correction", correction,
+                           c(
+                             none = "none",
+                             border = "rs", rs = "rs",
+                             KM = "km", km = "km", Kaplan = "km",
+                             han = "han", Hanisch = "han", hanisch = "han",
+                             best = "km"
+                           ),
+                           multi = TRUE
+  )
+  lamJ <- nJ/ volW
+  nnd <- spatstat.geom::nndist(X, k = k)
+
+  bdry <- bdist.points(X)
+  d <- (nnd <= bdry)
+  r <- seq(0, rmax, length.out = nrval)
+  breaks <- c(r[1L] - r[2L], r)
+  df <- data.frame(r = r, theo = 1 - exp(-lamJ * (4 / 3) * pi * r^3))
+  fname <- c("G", "list(I,J)")
+  Z <- fv(df, "r", quote(G[I, J](r)), "theo", . ~ r, c(0, rmax),
+          c("r", spatstat.explore::makefvlabel(NULL, NULL, fname, "pois")),
+          c("distance argument r", "theoretical Poisson %s"),
+          fname = fname, yexp = quote(G[list(I, J)](r))
+  )
+  if ("none" %in% correction) {
+    if (npts == 0) {
+      edf <- zeroes
+    } else {
+      hh <- hist(nnd[nnd <= rmax], breaks = breaks, plot = FALSE)$counts
+      edf <- cumsum(hh) / length(nnd)
+    }
+    Z <- bind.fv(
+      Z, data.frame(raw = edf),
+      spatstat.explore::makefvlabel(NULL, "hat", fname, "raw"),
+      "uncorrected estimate of %s", "raw"
+    )
+  }
+  if ("han" %in% correction) {
+    if (npts == 0) {
+      G <- zeroes
+    } else {
+      x <- nnd[d]
+      a <- spatstat.geom::eroded.volumes(W, r)
+      h <- hist(x[x <= rmax], breaks = breaks, plot = FALSE)$counts
+      G <- cumsum(h / a)
+      G <- G / max(G[is.finite(G)])
+    }
+    Z <- bind.fv(
+      Z, data.frame(han = G),
+      spatstat.explore::makefvlabel(NULL, "hat", fname, "han"),
+      "Hanisch estimate of %s", "han"
+    )
+    attr(Z, "alim") <- range(r[G <= 0.9])
+  }
+  if (any(correction %in% c("rs", "km"))) {
+    if (npts == 0) {
+      result <- data.frame(rs = zeroes, km = zeroes, hazard = zeroes)
+    } else {
+      o <- pmin.int(nnd, bdry)
+      result <- spatstat.explore::km.rs(o, bdry, d, breaks)
+      result <- as.data.frame(result[c("rs", "km", "hazard")])
+    }
+    Z <- bind.fv(
+      Z, result, c(
+        spatstat.explore::makefvlabel(NULL, "hat", fname, "bord"),
+        spatstat.explore::makefvlabel(NULL, "hat", fname, "km"), "hazard(r)"
+      ),
+      c(
+        "border corrected estimate of %s", "Kaplan-Meier estimate of %s",
+        "Kaplan-Meier estimate of hazard function lambda(r)"
+      ),
+      "km"
+    )
+    attr(Z, "alim") <- range(r[result$km <= 0.9])
+  }
+  nama <- names(Z)
+  spatstat.explore::fvnames(Z, ".") <- rev(nama[!(nama %in% c("r", "hazard"))])
+  formula(Z) <- . ~ r
+  spatstat.geom::unitname(Z) <- spatstat.geom::unitname(X)
+  return(Z)
+}
+
+
+
+#' Advanced Nearest Neighbour Distance Function G
+#' @description Estimates the nearest neighbour distance distribution
+#'  Gest from a point pattern in a window of arbitrary shape. Modified from the \emph{spatstat} package
+#' function \link[spatstat.explore]{Gest}  to allow for usage of nearest neighbors beyond the first
+#' @param k Integer, or integer vector. The algorithm will compute the distance to the kth nearest neighbour.
+#' See \link[spatstat.geom]{nndist}
+#' @inheritParams spatstat.explore::Gest
+#' @md
+#' @export
+"Gest_nn" <-
+  "nearest.neighbour" <-
+  function(X, r=NULL, breaks=NULL, k = 1, ..., correction=c("rs", "km", "han"),
+           domain=NULL) {
+    verifyclass(X, "ppp")
+    if(!is.null(domain))
+      stopifnot(is.subset.owin(domain, Window(X)))
+
+    ##
+    W <- X$window
+    npts <- spatstat.geom::npoints(X)
+    lambda <- npts/spatstat.geom::area(W)
+
+    ## determine r values
+    rmaxdefault <- spatstat.explore::rmax.rule("G", W, lambda)
+    breaks <- spatstat.geom::handle.r.b.args(r, breaks, W, rmaxdefault=rmaxdefault)
+    rvals <- breaks$r
+    rmax  <- breaks$max
+    zeroes <- numeric(length(rvals))
+
+    ## choose correction(s)
+    #  correction.given <- !missing(correction) && !is.null(correction)
+    if(is.null(correction)) {
+      correction <- c("rs", "km", "han")
+    } else correction <- spatstat.geom::pickoption("correction", correction,
+                                                   c(none="none",
+                                                     border="rs",
+                                                     rs="rs",
+                                                     KM="km",
+                                                     km="km",
+                                                     Kaplan="km",
+                                                     han="han",
+                                                     Hanisch="han",
+                                                     cs="han",
+                                                     ChiuStoyan="han",
+                                                     best="km"),
+                                                   multi=TRUE)
+
+    ##  compute nearest neighbour distances
+    nnd <- nndist(X$x, X$y, k = k)
+    ##  distance to boundary
+    bdry <- bdist.points(X)
+    ## restrict to subset ?
+    if(!is.null(domain)) {
+      ok <- inside.owin(X, w=domain)
+      nnd <- nnd[ok]
+      bdry <- bdry[ok]
+    }
+    ##  observations
+    o <- pmin.int(nnd,bdry)
+    ##  censoring indicators
+    d <- (nnd <= bdry)
+
+    ## initialise fv object
+    df <- data.frame(r=rvals, theo=1-exp(-lambda * pi * rvals^2))
+    Z <- fv(df, "r", substitute(G(r), NULL), "theo", . ~ r,
+            c(0,rmax),
+            c("r", "%s[pois](r)"),
+            c("distance argument r", "theoretical Poisson %s"),
+            fname="G")
+
+    if("none" %in% correction) {
+      ##  UNCORRECTED e.d.f. of nearest neighbour distances: use with care
+      if(npts <= 1)
+        edf <- zeroes
+      else {
+        hh <- hist(nnd[nnd <= rmax],breaks=breaks$val,plot=FALSE)$counts
+        edf <- cumsum(hh)/length(nnd)
+      }
+      Z <- bind.fv(Z, data.frame(raw=edf), "hat(%s)[raw](r)",
+                   "uncorrected estimate of %s", "raw")
+    }
+    if("han" %in% correction) {
+      if(npts <= 1)
+        G <- zeroes
+      else {
+        ##  uncensored distances
+        x <- nnd[d]
+        ##  weights
+        a <- eroded.areas(W, rvals, subset=domain)
+        ## calculate Hanisch estimator
+        h <- hist(x[x <= rmax], breaks=breaks$val, plot=FALSE)$counts
+        G <- cumsum(h/a)
+        G <- G/max(G[is.finite(G)])
+      }
+      ## add to fv object
+      Z <- bind.fv(Z, data.frame(han=G),
+                   "hat(%s)[han](r)",
+                   "Hanisch estimate of %s",
+                   "han")
+      ## modify recommended plot range
+      attr(Z, "alim") <- range(rvals[G <= 0.9])
+    }
+
+    if(any(correction %in% c("rs", "km"))) {
+      ## calculate Kaplan-Meier and border correction (Reduced Sample) estimates
+      want.rs <- "rs" %in% correction
+      want.km <- "km" %in% correction
+      if(npts == 0) {
+        result <- list(rs=zeroes, km=zeroes, hazard=zeroes, theohaz=zeroes)
+      } else {
+        result <- km.rs.opt(o, bdry, d, breaks, KM=want.km, RS=want.rs)
+        if(want.km)
+          result$theohaz <- 2 * pi * lambda * rvals
+      }
+      wanted <- c(want.rs, rep(want.km, 3L))
+      wantednames <- c("rs", "km", "hazard", "theohaz")[wanted]
+      result <- as.data.frame(result[wantednames])
+      ## add to fv object
+      Z <- bind.fv(Z, result,
+                   c("hat(%s)[bord](r)", "hat(%s)[km](r)",
+                     "hat(h)[km](r)", "h[pois](r)")[wanted],
+                   c("border corrected estimate of %s",
+                     "Kaplan-Meier estimate of %s",
+                     "Kaplan-Meier estimate of hazard function h(r)",
+                     "theoretical Poisson hazard function h(r)")[wanted],
+                   if(want.km) "km" else "rs")
+      ## modify recommended plot range
+      attr(Z, "alim") <- with(Z, range(Z$r[Z$km <= 0.9]))
+    }
+    nama <- names(Z)
+    fvnames(Z, ".") <- rev(setdiff(nama, c("r", "hazard", "theohaz")))
+    unitname(Z) <- unitname(X)
+    return(Z)
+  }
+
+
+
 #### G3multi ####
 #' Marked Nearest Neighbour Distance Function
 #'
@@ -641,7 +905,7 @@ quantess.pp3 <- function(M, Z, n, ..., type = 2, origin = c(0, 0), eps = NULL) {
 #' @seealso \code{\link{G3cross}}, \code{\link[spatstat.explore]{G3est}}
 #'
 #' @export
-G3multi <- function(X, I, J, rmax = NULL, nrval = 128, disjoint = NULL,
+G3multi <- function(X, I, J, rmax = NULL, nrval = 128, k = 1, disjoint = NULL,
                     correction = c("rs", "km", "han")) {
   spatstat.geom::verifyclass(X, "pp3")
   W <- X$domain
@@ -684,12 +948,12 @@ G3multi <- function(X, I, J, rmax = NULL, nrval = 128, disjoint = NULL,
   XI <- X[I]
   XJ <- X[J]
   if (disjoint) {
-    nnd <- spatstat.geom::nncross(XI, XJ, what = "dist")
+    nnd <- spatstat.geom::nncross(XI, XJ, k = k, what = "dist")
   } else {
     seqnp <- seq_len(npts)
     iX <- seqnp[I]
     iY <- seqnp[J]
-    nnd <- spatstat.geom::nncross(XI, XJ, iX, iY, what = "dist")
+    nnd <- spatstat.geom::nncross(XI, XJ, iX, iY, k = k, what = "dist")
   }
   bdry <- bdist.points(XI)
   d <- (nnd <= bdry)
@@ -857,7 +1121,7 @@ G3multi <- function(X, I, J, rmax = NULL, nrval = 128, disjoint = NULL,
 #'   \code{\link[spatstat.geom]{marks}}
 #'
 #' @export
-G3cross <- function(X, i, j, rmax = NULL, nrval = 128,
+G3cross <- function(X, i, j, rmax = NULL, nrval = 128, k = 1,
                     correction = c("rs", "km", "han")) {
   spatstat.geom::verifyclass(X, "pp3")
   if (!spatstat.geom::is.marked(X, dfok = FALSE)) {
@@ -886,7 +1150,8 @@ G3cross <- function(X, i, j, rmax = NULL, nrval = 128,
       stop("No points are of type j")
     }
     result <- G3multi(X, I, J,
-      rmax = rmax, nrval = nrval, disjoint = FALSE,
+      rmax = rmax, nrval = nrval, k = k,
+      disjoint = FALSE,
       correction = correction
     )
   }

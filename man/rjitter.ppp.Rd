@@ -14,6 +14,7 @@ Random Perturbation of a Point Pattern
 
 Other spatstat extensions: 
 \code{\link{G3cross}()},
+\code{\link{G3est_nn}()},
 \code{\link{G3multi}()},
 \code{\link{K3scaled}()},
 \code{\link{Tstat.pp3}()},
