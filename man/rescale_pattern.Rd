@@ -15,7 +15,7 @@ rescale_pattern(pattern, new_intensity)
 pp3_new will preserve all properties of the input \emph{pattern}, except the intensity
 }
 \description{
-Rescales an input 3D point pattern
+Rescales an input 3D point patterns
 }
 \details{
 Takes an input 3D point pattern (pp3 object) and scales it to have intensity of new.intensity by multiplying

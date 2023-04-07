@@ -2,44 +2,120 @@
 % Please edit documentation in R/rapt_summarize.R
 \name{plot_summary}
 \alias{plot_summary}
-\title{Plot summary functions}
+\title{Plot summary functions (developement version)}
 \usage{
 plot_summary(
   func = "K",
   observed_values,
   envelopes,
   ...,
-  pattern.colors = c(`95.0\% AI` = "pink", Median = "black", Observed = "blue"),
-  fill.colors = pattern.colors,
+  pattern.colors = c(`Envelope 1` = "pink", `Envelope 2` = "gray", Observed = "blue"),
+  fill.colors = NA,
+  sqrt = "K",
+  raw = "FALSE",
+  base_value = "first",
   unit = "nm",
   K_cor = "trans",
   G_cor = "km",
   F_cor = "km",
   GXGH_cor = "km",
-  GXHG_cor = "km"
+  GXHG_cor = "km",
+  G2_cor = "km",
+  alpha = 0.5,
+  legend.key.size = 20,
+  legend.text.size = 20,
+  legend.position = c(0.75, 0.8),
+  axis.title.size = 40,
+  title = "",
+  title.size = 40,
+  axis.text.x.size = 40,
+  axis.text.y.size = 40,
+  linewidth = 0.5,
+  env_linewidth = 0.5,
+  linetype = "solid",
+  env_linetype = "dashed"
 )
 }
 \arguments{
-\item{func}{Summary function to plot}
+\item{func}{Summary function to plot.}
 
-\item{observed_values}{observed summary function value}
+\item{observed_values}{a list. observed summary function value. Must have one of the following structures
+\itemize{
+\item{Option 1: List of summary functions}{observed_values[\link{func}][\link{cor}]}
+\item{Option 2: List of lists of summary functions}{observed_values[\link{pattern_num}][\link{func}][\link{cor}]}
+\item{Option 2: Dataframe}{observed_values\link{,c("r", y_value)}}
+}}
 
-\item{envelopes}{theoretical values found by function such as \verb{calc_summary_funcs().} Should be list}
+\item{envelopes}{a list envelope values found by
+function such as   \code{\link{calc_summary_funcs}}.  Should be list of length equal
+to the number of envelopes.  The structure should resemble:
+\code{envelopes[[envelope_num]]$rrl_K[, c("r", "mmean")]}}
 
-\item{pattern.colors}{colors and names for envelope lines}
+\item{pattern.colors}{colors and names for envelope lines.
+MUST follow some formatting rules.  Envelope names must come first.
+If each observed value corresponds to a different envelope, then
+the number of \code{observed_values} must match \code{length(envelopes)} and only
+the first \code{1:length(envelopes)} of \code{pattern_colors} will be used.
+and must set \code{base_value = "each"}.  If not, each envelope and each observed
+value needs its own color.  then the \code{mmean} value from
+\code{envelopes[[1]]} will be subtracted from each envelope and observed value.}
 
-\item{fill.colors}{colors and names for envelope fill.  Match names to \code{pattern.colors}}
+\item{fill.colors}{colors and names for envelope fill.  Match names to \code{pattern.colors}.
+Recommended to leave as NA and it will automattically be set to match  \code{pattern.colors}}
 
-\item{K_cor}{edge correction(s) to be used for K function}
+\item{sqrt}{either \verb{"K", "all", or "none"}. If \code{"K"},
+then only \code{expression(tilde(K)[g](r))} will be found using the differences of the
+square roots, rather than differences.  If \code{"all"}, then all functions will be found
+using such.  If \code{"none"} (or actually anything other than the first two options) then
+no square roots are taken. Ignored if \code{raw = "TRUE"}}
 
-\item{G_cor}{edge correction(s) to be used for G function}
+\item{base_value}{a character, either \verb{"first" or "each"}.  Does each observed value
+correspond to a different envelope?  If yes, set to \code{"each"}. Otherwise, set to
+\code{"first"} and the envelopes[\link{1}] will be used for each}
 
-\item{F_cor}{edge correction(s) to be used for F function}
+\item{unit}{a character.  This will appear as the units in the x axis label}
 
-\item{GXGH_cor}{edge correction(s) to be used for GXGH function}
+\item{K_cor}{edge correction(s) to be used when \code{func = "K"}}
 
-\item{GXHG_cor}{edge correction(s) to be used for GXHG function}
+\item{G_cor}{edge correction(s) to be used when \code{func = "G"}}
+
+\item{F_cor}{edge correction(s) to be used when \code{func = "F"}}
+
+\item{GXGH_cor}{edge correction(s) to be used when \code{func = "GXGH"}}
+
+\item{GXHG_cor}{edge correction(s) to be used when \code{func = "GXHG"}}
+
+\item{alpha}{numeric between 0 and 1.  Transparency of envelopes}
+
+\item{legend.key.size}{numeric.  size of legend key}
+
+\item{legend.text.size}{numeric. size of legend text}
+
+\item{axis.title.size}{numeric.  Size of axis title}
+
+\item{title}{a character.  Text for title}
+
+\item{title.size}{numeric.  Title size}
+
+\item{axis.text.x.size}{numeric.  size of text on x axis}
+
+\item{axis.text.y.size}{numeric.  size of text on y axis}
+
+\item{linewidth}{numeric.  Width of lines in plot}
+
+\item{env_linewidth}{numeric.  Width of lines that make up envelope edges}
+
+\item{linetype}{a character.  Type of lines that make up lines}
+
+\item{env_linetype}{a character.  Type of lines that make up  envelope lines}
+
+\item{raw.}{A logical.  If TRUE, then no envelope mmeans are subtracted from each value}
+
+\item{legend.position.}{vector of 2 numerics.  coordinates of legend}
 }
 \description{
 Plot the observed value with envelopes for expected values for summary function
+}
+\details{
+The best way to learn about this function is to read the parameter definitions.
 }

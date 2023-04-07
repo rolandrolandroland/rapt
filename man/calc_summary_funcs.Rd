@@ -9,7 +9,6 @@ calc_summary_funcs(
   funcs = c("K", "G", "F", "GXGH"),
   dopant_formula,
   host_formula,
-  k = 1,
   maxKr = 10,
   nKr = 200,
   maxGr = 5,
@@ -22,7 +21,8 @@ calc_summary_funcs(
   G_cor = "km",
   F_cor = "km",
   GXGH_cor = "km",
-  GXHG_cor = "km"
+  GXHG_cor = "km",
+  G2_cor = "km"
 )
 }
 \arguments{
@@ -48,5 +48,5 @@ calc_summary_funcs(
 }
 \description{
 Cacluate that summary functions included in \code{funcs} on \code{pattern}, a point pattern
-of class ppp or pp3.
+of class ppp or pp3.  Now can do advanced nearest neighbor if \code{funcs} contains \code{G2}, \code{G3}, etc.
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/rapt_summarize.R
 \name{average_relabelings}
 \alias{average_relabelings}
-\title{Functionto take all relabelings and return averages and envelope values}
+\title{Average relabelings}
 \usage{
 average_relabelings(
   relabelings,
@@ -12,14 +12,33 @@ average_relabelings(
   G_cor = "km",
   F_cor = "km",
   GXGH_cor = "km",
-  GXHG_cor = "km"
+  GXHG_cor = "km",
+  G2_cor = "km"
 )
 }
 \arguments{
-\item{relabelings}{output of  \code{\link[rapt]{relabel_summarize}} function}
+\item{relabelings}{output of  \code{\link[rTEM]{relabel_summarize}} function}
 
-\item{envelope.value}{size of envelope to compute.  Should be decimal (e.g. 0.95 = 95\%)}
+\item{envelope.value}{size of envelope to compute.  Should be decimal (e.g. 0.95 = 95\\%)}
+
+\item{funcs}{vector of summary functions to calculate}
+
+\item{K_cor}{edge correction(s) to be used for K function}
+
+\item{G_cor}{edge correction(s) to be used for G function}
+
+\item{F_cor}{edge correction(s) to be used for F function}
+
+\item{GXGH_cor}{edge correction(s) to be used for GXGH function}
+
+\item{GXHG_cor}{edge correction(s) to be used for GXHG function}
+}
+\value{
+data frame with x value (distance), average y value, and y value envelopess
 }
 \description{
-Functionto take all relabelings and return averages and envelope values
+Function take all relabelings and return averages and envelope values
+}
+\details{
+Take output of  \code{\link[rTEM]{relabel_summarize}} and create envelopes
 }
