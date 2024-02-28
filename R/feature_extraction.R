@@ -123,7 +123,7 @@ create_training_data <- function(i, pattern, rrl, nper = 1, params,
     GXGH_start <- as.numeric(Sys.time())
     if (length(GXGH_feats_to_use)) {
       GXGH_result <- G3cross(cluster[[2]],
-        i = dopant_formula, j = host_formula,
+        i = "A", j = "C",
         correction = "km", rmax = maxGXGHr, nrval = nGXr
       )
       GXGH_features <- g3Xfeatures(GXGH_result$r,
@@ -141,7 +141,7 @@ create_training_data <- function(i, pattern, rrl, nper = 1, params,
     GXHG_start <- as.numeric(Sys.time())
     if (length(GXHG_feats_to_use)) {
       GXHG_result <- G3cross(cluster[[2]],
-        i = dopant_formula, j = host_formula,
+        i = "A", j = "C",
         correction = "km", rmax = maxGXHGr, nrval = nGXr
       )
       GXHG_features <- g3Xfeatures(GXHG_result$r,

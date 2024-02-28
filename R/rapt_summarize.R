@@ -231,14 +231,17 @@ relabel_summarize <- function(seed, pattern, funcs = c("K", "G", "F", "GXGH"),
     }
   }
 
-
   all_funcs <- c("K", "G", "F", "GXGH", "GXHG")
 
+  G_funcs = rep(NA, 9)
+  for (i in 2:10) {
+    G_funcs[i-1] = paste("G", i, sep = "")
+  }
+  all_funcs = c(all_funcs, G_funcs)
   G_nn = rep(NA, 9)
   for (i in 2:10) {
-    G_nn[i-1] = paste("G", i, sep = "")
+    G_nn[i-1] = paste("rrl_G", i, sep = "")
   }
-  all_funcs = c(all_funcs, G_nn)
 
   #all_funcs %in% funcs
   relabs <- c("rrl_K", "rrl_G", "rrl_F", "rrl_GXGH", "rrl_GXHG")
@@ -287,7 +290,7 @@ calc_summary_funcs <- function(pattern, funcs = c("K", "G", "F", "GXGH"),
     }
     for (i in 2:10) {
       if (paste("G", i, sep = "") %in% funcs) {
-        G_i = G3est_nn(dopant_relabeled,  rmax = maxGr, nrval = nGr,
+        G_i = G3est_nn(pattern_dopant,  rmax = maxGr, nrval = nGr,
                        k = i, correction = G2_cor)
         assign(paste("G", i, sep=""), G_i)
       }

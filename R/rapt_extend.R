@@ -658,7 +658,7 @@ G3est_nn = function(X, k =1,
                            ),
                            multi = TRUE
   )
-  lamJ <- nJ/ volW
+  lamJ <- n/volW
   nnd <- spatstat.geom::nndist(X, k = k)
 
   bdry <- bdist.points(X)

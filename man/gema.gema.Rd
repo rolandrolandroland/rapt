@@ -20,8 +20,8 @@ Reprocess Clusters Identified Using GEMA
 }
 \seealso{
 Other cluster identification functions: 
-\code{\link{gema.pp3}()},
 \code{\link{gema}()},
+\code{\link{gema.pp3}()},
 \code{\link{msa}()}
 }
 \concept{cluster identification functions}

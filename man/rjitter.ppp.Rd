@@ -19,19 +19,19 @@ Other spatstat extensions:
 \code{\link{K3scaled}()},
 \code{\link{Tstat.pp3}()},
 \code{\link{bdist.points}()},
-\code{\link{marktable.pp3}()},
 \code{\link{marktable}()},
+\code{\link{marktable.pp3}()},
 \code{\link{quadratcount.pp3}()},
 \code{\link{quadrats.pp3}()},
 \code{\link{rPoissonCluster3}()},
-\code{\link{rjitter.pp3}()},
 \code{\link{rjitter}()},
+\code{\link{rjitter.pp3}()},
 \code{\link{rpoint3}()},
 \code{\link{sample.pp3}()},
 \code{\link{sample.ppp}()},
 \code{\link{shift.pp3}()},
-\code{\link{studpermu.test.pp3}()},
 \code{\link{studpermu.test}()},
+\code{\link{studpermu.test.pp3}()},
 \code{\link{superimpose.pp3}()}
 }
 \concept{spatstat extensions}

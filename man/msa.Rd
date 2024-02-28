@@ -56,8 +56,8 @@ behaviours,"
 }
 \seealso{
 Other cluster identification functions: 
+\code{\link{gema}()},
 \code{\link{gema.gema}()},
-\code{\link{gema.pp3}()},
-\code{\link{gema}()}
+\code{\link{gema.pp3}()}
 }
 \concept{cluster identification functions}
