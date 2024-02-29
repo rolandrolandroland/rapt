@@ -115,6 +115,10 @@ clustersim <- function(under, over, rcp_rad,
   # Re-size and shift the over point pattern so that it lines up with
   # the under point pattern with buffers
   over.scaledcut <- over_cut(over.scaled.pb, rep(sidelength, 3), 2.5 * cr)
+  if (npoints(over.scaledcut) == 0) {
+    print("No cluster - cluster radius and concentration too large")
+    return(-1)
+  }
   over.scaledcut.coo <- spatstat.geom::coords(over.scaledcut)
 
   # Generate normal distributed radii for cluster centers
